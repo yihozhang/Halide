@@ -4,6 +4,7 @@
 #include "IRMutator.h"
 #include "IROperator.h"
 #include "Util.h"
+#include "EqSatIRPrinter.h"
 
 /** \file Support extraction of AMX instructions. */
 
@@ -380,6 +381,8 @@ struct Matmul {
 };
 
 Matmul convert_to_matmul(const Store *op, const string &new_name, AMXOpType op_type) {
+    EqSatIRPrinter printer(std::cerr);
+    printer.print(op->value);
     // m[ramp(0, 1, S)] = VectorAdd(lhs[{XYR tile}] * xX(rhs[{YR tile}])) + m[ramp(0, 1, S)]
     const auto wild_i8x = Variable::make(Int(8, 0), "*");
     const auto wild_u8x = Variable::make(UInt(8, 0), "*");

@@ -487,6 +487,7 @@ SOURCE_FILES = \
   Elf.cpp \
   EliminateBoolVectors.cpp \
   EmulateFloat16Math.cpp \
+  EqSatIRPrinter.cpp \
   Error.cpp \
   Expr.cpp \
   ExtractTileOperations.cpp \
@@ -682,6 +683,7 @@ HEADER_FILES = \
   Elf.h \
   EliminateBoolVectors.h \
   EmulateFloat16Math.h \
+  EqSatIRPrinter.h \
   Error.h \
   Expr.h \
   ExprUsesVar.h \
