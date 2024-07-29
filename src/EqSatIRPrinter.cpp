@@ -1,5 +1,10 @@
 #include "EqSatIRPrinter.h"
 #include "Expr.h"
+#define GENERATE_VISIT_BINOP(NAME)                                               \
+    void EqSatIRPrinter::visit(const NAME *e) {                                  \
+        printArgs(stream, "Bop", "(" #NAME ")", EXPR_ARG(e->a), EXPR_ARG(e->b)); \
+    }
+
 #define TYPE_ARG(type) ([this, e]() { print_type(type); })
 #define EXPR_ARG(expr) ([this, e]() { (expr).accept(this); })
 #define NAME_ARG(name) ("\"" + (name) + "\"")
@@ -104,10 +109,6 @@ void EqSatIRPrinter::visit(const Reinterpret *e) {
 void EqSatIRPrinter::visit(const Variable *e) {
     printArgs(stream, "Var", TYPE_ARG(e->type), NAME_ARG(e->name));
 }
-#define GENERATE_VISIT_BINOP(NAME)                                               \
-    void EqSatIRPrinter::visit(const NAME *e) {                                  \
-        printArgs(stream, "Bop", "(" #NAME ")", EXPR_ARG(e->a), EXPR_ARG(e->b)); \
-    }
 
 GENERATE_VISIT_BINOP(Add)
 GENERATE_VISIT_BINOP(Sub)
