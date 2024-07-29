@@ -57,6 +57,7 @@ protected:
     void visit(const Broadcast *) override;
     void visit(const Call *) override;
     void visit(const Let *) override;
+    void visit(const VectorReduce *) override;
 };
 
 }  // namespace Internal

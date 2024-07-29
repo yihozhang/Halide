@@ -1,5 +1,7 @@
 #include "EqSatIRPrinter.h"
+#include "Error.h"
 #include "Expr.h"
+
 #define GENERATE_VISIT_BINOP(NAME)                                               \
     void EqSatIRPrinter::visit(const NAME *e) {                                  \
         printArgs(stream, "Bop", "(" #NAME ")", EXPR_ARG(e->a), EXPR_ARG(e->b)); \
@@ -161,6 +163,11 @@ void EqSatIRPrinter::visit(const Call *e) {
 
 void EqSatIRPrinter::visit(const Let *e) {
     user_error << "Not supported\n";
+}
+
+void EqSatIRPrinter::visit(const VectorReduce *e) {
+    internal_assert(e->op == VectorReduce::Operator::Add) << "Only supporting Add for now\n";
+    printArgs(stream, "VectorReduce", TYPE_ARG(e->type), "(Add)", EXPR_ARG(e->value));
 }
 
 void EqSatIRPrinter::print(const Expr &e) {

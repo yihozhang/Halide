@@ -43,7 +43,7 @@ Expr EqSatIRParser::parse_expr() {
         auto type = parse_type();
         auto name = parse_str();
         auto index = parse_expr();
-        result = Load::make(type, name, index, Buffer<>(), Parameter(), const_true(), ModulusRemainder());
+        result = Load::make(type, name, index, Buffer<>(), Parameter(), const_true(type.lanes()), ModulusRemainder());
     } else if (is_head("Ramp")) {
         auto base = parse_expr();
         auto stride = parse_expr();
@@ -67,6 +67,15 @@ Expr EqSatIRParser::parse_expr() {
         auto type = parse_type();
         auto name = parse_str();
         result = Variable::make(type, name);
+    } else if (is_head("VectorReduce")) {
+        auto type = parse_type();
+        // TODO: only does add now
+        expect("(Add)");
+        auto expr = parse_expr();
+        result = VectorReduce::make(VectorReduce::Operator::Add, expr, type.lanes());
+    } else if (is_head("Shuffle")) {
+
+    
     } else if (is_head("IntImm")) {
         auto bits = parse_int();
         auto value = parse_int();
@@ -156,12 +165,18 @@ std::string EqSatIRParser::parse_str() {
 
 int EqSatIRParser::parse_int() {
     skip_whitespace();
-    return std::stoi(prog.substr(curr), &curr);
+    size_t offset;
+    int result = std::stoi(prog.substr(curr), &offset);
+    curr += offset;
+    return result;
 }
 
 double EqSatIRParser::parse_double() {
     skip_whitespace();
-    return std::stod(prog.substr(curr), &curr);
+    size_t offset;
+    double result = std::stod(prog.substr(curr), &offset);
+    curr += offset;
+    return result;
 }
 
 std::vector<Expr> EqSatIRParser::parse_vec_expr() {
