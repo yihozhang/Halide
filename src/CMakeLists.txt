@@ -176,7 +176,9 @@ set(HEADER_FILES
     VectorizeLoops.h
     WasmExecutor.h
     WrapCalls.h
-    )
+        EqSatIRPrinter.h
+        EqSatIRPrinter.h
+)
 
 set(SOURCE_FILES
     AbstractGenerator.cpp
@@ -364,7 +366,8 @@ set(SOURCE_FILES
     VectorizeLoops.cpp
     WasmExecutor.cpp
     WrapCalls.cpp
-    )
+        EqSatIRPrinter.h
+)
 
 set(C_TEMPLATE_FILES
     CodeGen_C_prologue

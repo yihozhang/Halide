@@ -1,12 +1,16 @@
 #include "ExtractTileOperations.h"
 
+#include "EqSatIRParser.h"
+#include "EqSatIRPrinter.h"
 #include "IRMatch.h"
 #include "IRMutator.h"
 #include "IROperator.h"
 #include "Util.h"
-#include "EqSatIRPrinter.h"
-#include "EqSatIRParser.h"
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
 #include <sstream>
+#include <unistd.h>
 
 /** \file Support extraction of AMX instructions. */
 
@@ -383,15 +387,6 @@ struct Matmul {
 };
 
 Matmul convert_to_matmul(const Store *op, const string &new_name, AMXOpType op_type) {
-    EqSatIRPrinter printer(std::cerr);
-    printer.print(op->value);
-    std::ostringstream oss;
-    EqSatIRPrinter sprinter(oss);
-    sprinter.print(op->value);
-    auto prog = oss.str();
-    EqSatIRParser parser(prog);
-    auto expr = parser.parse_expr();
-    printer.print(expr);
     // m[ramp(0, 1, S)] = VectorAdd(lhs[{XYR tile}] * xX(rhs[{YR tile}])) + m[ramp(0, 1, S)]
     const auto wild_i8x = Variable::make(Int(8, 0), "*");
     const auto wild_u8x = Variable::make(UInt(8, 0), "*");
@@ -662,6 +657,18 @@ class ExtractTileOperations : public IRMutator {
             found_tile_y = matmul.tile_y;
             found_tile_r = matmul.tile_r;
 
+            std::ostringstream oss;
+            EqSatIRPrinter sprinter(oss);
+            sprinter.print(op->value);
+            auto egglog_prog = oss.str();
+
+            auto optimized = run_egglog(egglog_prog);
+            EqSatIRParser parser(optimized);
+            bool amx_synthesized = optimized.find("tile_matmul") != -1;
+            internal_assert(amx_synthesized) << "Oops";
+            std::cerr << "amx synthesized";
+            auto opvalue = parser.parse_expr();
+
             return matmul.stmt;
         }
 
@@ -686,5 +693,64 @@ class ExtractTileOperations : public IRMutator {
 Stmt extract_tile_operations(const Stmt &s) {
     return ExtractTileOperations().mutate(s);
 }
+
+std::string run_egglog(const std::string &prog) {
+    std::string header;
+// load header
+#include "egglog/instrsel.egg"
+    std::string schedule;
+#include "egglog/schedule.egg"
+    std::string binding = "(let prog " + prog + ")";
+
+    std::string egglog_prog = header + binding + schedule;
+
+    int pipe_stdin[2];
+    int pipe_stdout[2];
+
+    if (pipe(pipe_stdin) < 0 || pipe(pipe_stdout) < 0) {
+        internal_error << "Failed to create pipe for egglog";
+        return "";
+    }
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        internal_error << "Failed to exec egglog";
+    }
+
+    if (pid == 0) {
+        const char *argv[] = {"egglog", nullptr};
+        close(pipe_stdin[1]);
+        close(pipe_stdout[0]);
+
+        // Redirect stdin and stdout
+        dup2(pipe_stdin[0], STDIN_FILENO);
+        dup2(pipe_stdout[1], STDOUT_FILENO);
+        close(pipe_stdin[0]);
+        close(pipe_stdout[1]);
+        execvp(argv[0], const_cast<char **>(argv));
+        internal_error << "egglog failed to exec";
+        return "";
+    }
+
+    close(pipe_stdout[1]);
+
+    // Write to the subprocess's stdin
+    write(pipe_stdin[1], egglog_prog.c_str(), egglog_prog.size());
+    close(pipe_stdin[1]);
+
+    // Read from the subprocess's stdout
+    std::ostringstream oss;
+    char buffer[128];
+    ssize_t count;
+    while ((count = read(pipe_stdout[0], buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[count] = '\0';  // Null-terminate the string
+        oss << buffer;
+    }
+
+    close(pipe_stdout[0]);
+    return oss.str();
+}
+
 }  // namespace Internal
 }  // namespace Halide

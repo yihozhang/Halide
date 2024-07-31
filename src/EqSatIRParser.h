@@ -12,7 +12,7 @@ namespace Internal {
 
 struct EqSatIRParser {
 public:
-    EqSatIRParser(std::string prog)
+    EqSatIRParser(const std::string& prog)
         : prog(prog) {};
     Expr parse_expr();
     Expr parse_bop();
@@ -57,6 +57,9 @@ private:
         }
     }
 };
+
+// TODO: move this to its own file
+std::string run_egglog(const std::string& prog);
 
 }  // namespace Internal
 

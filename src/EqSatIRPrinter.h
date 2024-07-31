@@ -27,7 +27,7 @@ public:
 protected:
     /** The stream on which we're outputting */
     std::ostream &stream;
-    void print_type(const Type& t);
+    void print_type(const Type& t) const;
     void visit(const IntImm *) override;
     void visit(const UIntImm *) override;
     void visit(const FloatImm *) override;

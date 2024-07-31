@@ -14,7 +14,7 @@ namespace Halide {
 
 namespace Internal {
 
-void EqSatIRPrinter::print_type(const Type &t) {
+void EqSatIRPrinter::print_type(const Type &t) const {
     auto code = t.code();
     std::string s;
     switch (code) {

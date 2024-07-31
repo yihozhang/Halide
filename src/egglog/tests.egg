@@ -1,0 +1,157 @@
+(include "instrsel.egg")
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tests from Halide
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(push)
+;; A real example from Halide
+(let lhs-index 
+    (Bop (Sub)
+         (Bop (Add) 
+              (Ramp (Broadcast (Bop (Mul) (Bop (Add) (Var int64x1 "matmul_global_wrapper$0.min.1") 
+                                                     (Var int64x1 "matmul_global_wrapper$0.s0.x.mmxi.base.s")) 
+                                          (Var int64x1 "lhs.stride.1")) 
+                                32)
+                    (Broadcast (Var int64x1 "lhs.stride.1") 32)
+                     6)
+              (Broadcast (Ramp (Bop (Mul) (Var int64x1 "matmul.s1.r9$x.rro") (IntImm64 4)) (IntImm64 1) 4) 48))
+         (Broadcast (Bop (Add) (Bop (Mul) (Var int64x1 "lhs.min.1") (Var int64x1 "lhs.stride.1")) (Var int64x1 "lhs.min.0")) 192)
+         ))
+
+
+(let rhs-index 
+    (Ramp 
+        (Ramp (Bop (Sub) 
+                   (Bop (Add) (Bop (Mul) (Bop (Add) (Var int64x1 "matmul_global_wrapper$0.min.0") 
+                                                    (Var int64x1 "matmul_global_wrapper$0.s0.y.mmyi.base.s")) 
+                                         (Var int64x1 "rhs.stride.1"))
+                              (Bop (Mul) (Var int64x1 "matmul.s1.r9$x.rro") (Var int64x1 "rhs.stride.2")))
+                   (Bop (Add) (Bop (Mul) (Var int64x1 "rhs.min.2") (Var int64x1 "rhs.stride.2"))
+                              (Bop (Add) (Bop (Mul) (Var int64x1 "rhs.min.1") (Var int64x1 "rhs.stride.1"))
+                                         (Var int64x1 "rhs.min.0"))))
+               (IntImm64 1)
+               4)
+        ; The original code emitted by Halide is (Broadcast (Var "rhs.stride.1") 4) for correctness_tiled_matmul.matmul<uint8>(32, 32, 32, 8, 8, 8)
+        ; But that is incorrect, rhs.stride.1 is not necessarily 4. If it's not 4, this means there are extra "padding" in between (flat) columns.
+        ; TODO: Now I'm wondering if Halide can handle the no-swizzling case (A(k, i) * B(k, j)).
+        (Broadcast (IntImm64 4) 4)
+        8))
+
+
+(let e
+    (Bop (Add)
+        (VectorReduce (Int 32 48) (Add)
+            (Bop (Mul) (Cast (Int 32 192) (Load (Int 8 192) "lhs" lhs-index))
+                       (Broadcast (Cast (Int 32 32) (Load (Int 8 32) "rhs" rhs-index)) 6)
+            ))
+        (Load (Int 32 48) "matmul" (Ramp (IntImm64 0) (IntImm64 1) 48)))
+)
+
+; (int32x48)vector_reduce_add(
+;     (int32x192((int8x192)lhs[
+;         (
+;             ramp(
+;                 x32((matmul_global_wrapper$0.min.1 + matmul_global_wrapper$0.s0.x.mmxi.base.s)*lhs.stride.1), 
+;                 x32(lhs.stride.1), 
+;                 6
+;             ) + x48(ramp(matmul.s1.r9$x.rro*4, 1, 4))
+;         ) - x192(
+;             (lhs.min.1*lhs.stride.1) + lhs.min.0
+;         )
+;     ]) * x6(
+;         int32x32((int8x32)rhs[
+;             ramp(
+;                 ramp(
+;                     ((
+;                         (matmul_global_wrapper$0.min.0 + matmul_global_wrapper$0.s0.y.mmyi.base.s)
+;                         * rhs.stride.1
+;                      ) + (matmul.s1.r9$x.rro*rhs.stride.2)) 
+;                     - ((rhs.min.2*rhs.stride.2) + ((rhs.min.1*rhs.stride.1) + rhs.min.0)), 
+;                     1, 
+;                     4
+;                 ), 
+;                 x4(rhs.stride.1), 
+;                 8
+;             )
+;         ])))
+; ) + matmul[ramp(0, 1, 48)]
+
+(run 10)
+(extract e)
+
+(pop)
+
+
+(push)
+;; A real example from Halide
+(let lhs-index 
+    (Bop (Sub)
+         (Bop (Add) 
+              (Ramp (Broadcast (Bop (Mul) (Bop (Add) (Var int64x1 "matmul_global_wrapper$0.min.1") 
+                                                     (Var int64x1 "matmul_global_wrapper$0.s0.x.mmxi.base.s")) 
+                                          (Var int64x1 "lhs.stride.1")) 
+                                32)
+                    (Broadcast (Var int64x1 "lhs.stride.1") 32)
+                     6)
+              (Broadcast (Ramp (Bop (Mul) (Var int64x1 "matmul.s1.r9$x.rro") (IntImm64 4)) (IntImm64 1) 4) 48))
+         (Broadcast (Bop (Add) (Bop (Mul) (Var int64x1 "lhs.min.1") (Var int64x1 "lhs.stride.1")) (Var int64x1 "lhs.min.0")) 192)
+         ))
+
+
+(let rhs-index 
+    (Ramp (Bop (Sub) 
+                (Bop (Add) (Bop (Mul) (Bop (Add) (Var int64x1 "matmul_global_wrapper$0.min.0") 
+                                                (Var int64x1 "matmul_global_wrapper$0.s0.y.mmyi.base.s")) 
+                                        (Var int64x1 "rhs.stride.1"))
+                            (Bop (Mul) (Var int64x1 "matmul.s1.r9$x.rro") (Var int64x1 "rhs.stride.2")))
+                (Bop (Add) (Bop (Mul) (Var int64x1 "rhs.min.2") (Var int64x1 "rhs.stride.2"))
+                            (Bop (Add) (Bop (Mul) (Var int64x1 "rhs.min.1") (Var int64x1 "rhs.stride.1"))
+                                        (Var int64x1 "rhs.min.0"))))
+            (IntImm64 1)
+            32))
+
+
+(let e
+    (Bop (Add)
+        (VectorReduce (Int 32 48) (Add)
+            (Bop (Mul) (Cast (Int 32 192) (Load (Int 8 192) "lhs" lhs-index))
+                       (Broadcast (Cast (Int 32 32) (Load (Int 8 32) "rhs" rhs-index)) 6)
+            ))
+        (Load (Int 32 48) "matmul" (Ramp (IntImm64 0) (IntImm64 1) 48)))
+)
+
+; (int32x48)vector_reduce_add(
+;     (int32x192((int8x192)lhs[
+;         (
+;             ramp(
+;                 x32((matmul_global_wrapper$0.min.1 + matmul_global_wrapper$0.s0.x.mmxi.base.s)*lhs.stride.1), 
+;                 x32(lhs.stride.1), 
+;                 6
+;             ) + x48(ramp(matmul.s1.r9$x.rro*4, 1, 4))
+;         ) - x192(
+;             (lhs.min.1*lhs.stride.1) + lhs.min.0
+;         )
+;     ]) * x6(
+;         int32x32((int8x32)rhs[
+;             ramp(
+;                 ramp(
+;                     ((
+;                         (matmul_global_wrapper$0.min.0 + matmul_global_wrapper$0.s0.y.mmyi.base.s)
+;                         * rhs.stride.1
+;                      ) + (matmul.s1.r9$x.rro*rhs.stride.2)) 
+;                     - ((rhs.min.2*rhs.stride.2) + ((rhs.min.1*rhs.stride.1) + rhs.min.0)), 
+;                     1, 
+;                     4
+;                 ), 
+;                 x4(rhs.stride.1), 
+;                 8
+;             )
+;         ])))
+; ) + matmul[ramp(0, 1, 48)]
+
+(run 10)
+(extract e)
+
+(pop)
