@@ -1,6 +1,7 @@
 ; schedule =  R"***(
 
-(run 10)
+(run 20)
 (extract prog)
+(check (Broadcast (Ramp (IntImm32 0) (IntImm32 1) 4) 2))
 
 ; )***"; schedule += "\n";

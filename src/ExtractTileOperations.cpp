@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <memory>
 #include <sstream>
+#include <sys/fcntl.h>
 #include <unistd.h>
 
 /** \file Support extraction of AMX instructions. */
@@ -656,7 +657,8 @@ class ExtractTileOperations : public IRMutator {
             found_tile_x = matmul.tile_x;
             found_tile_y = matmul.tile_y;
             found_tile_r = matmul.tile_r;
-
+            std::ostringstream oss1;
+            oss1 << op->value;
             std::ostringstream oss;
             EqSatIRPrinter sprinter(oss);
             sprinter.print(op->value);
@@ -664,10 +666,13 @@ class ExtractTileOperations : public IRMutator {
 
             auto optimized = run_egglog(egglog_prog);
             EqSatIRParser parser(optimized);
-            bool amx_synthesized = optimized.find("tile_matmul") != -1;
-            internal_assert(amx_synthesized) << "Oops";
-            std::cerr << "amx synthesized";
             auto opvalue = parser.parse_expr();
+            bool amx_synthesized = optimized.find("tile_matmul") != -1;
+            if (!amx_synthesized) {
+                std::cerr << opvalue << "\n";
+            }
+            internal_assert(amx_synthesized) << "Oops";
+            std::cerr << "amx synthesized\n";
 
             return matmul.stmt;
         }
@@ -698,8 +703,10 @@ std::string run_egglog(const std::string &prog) {
     std::string header;
 // load header
 #include "egglog/instrsel.egg"
+
     std::string schedule;
 #include "egglog/schedule.egg"
+
     std::string binding = "(let prog " + prog + ")";
 
     std::string egglog_prog = header + binding + schedule;
@@ -726,6 +733,8 @@ std::string run_egglog(const std::string &prog) {
         // Redirect stdin and stdout
         dup2(pipe_stdin[0], STDIN_FILENO);
         dup2(pipe_stdout[1], STDOUT_FILENO);
+        int devnull = open("/dev/null", O_WRONLY | O_CREAT, 0666);
+        dup2(devnull, STDERR_FILENO);
         close(pipe_stdin[0]);
         close(pipe_stdout[1]);
         execvp(argv[0], const_cast<char **>(argv));

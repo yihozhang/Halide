@@ -53,9 +53,9 @@
 ;; name index
 (function Load (Type String Expr) Expr)
 ;; base stride lanes
-(function Ramp (Expr Expr i64) Expr)
+(function Ramp (Expr Expr i64) Expr :cost 100)
 ;; value lanes
-(function Broadcast (Expr i64) Expr)
+(function Broadcast (Expr i64) Expr :cost 100)
 ;; name value body
 ;; TODO: Not sure if we need this one, binding is tricky
 (function Let (String Expr Expr) Expr)
@@ -68,9 +68,9 @@
 (function VectorReduce (Type BinOp Expr) Expr)
 ;;                bits val
 (function IntImm (i64  i64) Expr)
+; u64 is not supported in egglog
+(function UIntImm (i64  i64) Expr)
 (function FloatImm (i64 f64) Expr)
-; UInt is not supported in egglog
-; (UIntImm u64)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -95,6 +95,10 @@
 (CommBop (Max))
 (CommBop (EQ))
 (CommBop (NE))
+
+(relation AddOrSub (BinOp))
+(AddOrSub (Add))
+(AddOrSub (Sub))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Analysis rules
@@ -170,10 +174,10 @@
 ; Int8/UInt8
 (rule (
     (= e (Bop (Add) 
-        (VectorReduce (UIntOrInt signed 32 out-lanes) (Add) 
+        (VectorReduce (Int 32 out-lanes) (Add) 
             (Bop (Mul) 
-                (Cast (UIntOrInt signed 32 tot-lanes) (Load (UIntOrInt signed 8 tot-lanes) lhs-name lhs-index)) 
-                (Cast (UIntOrInt signed 32 tot-lanes) (Load (UIntOrInt signed 8 tot-lanes) rhs-name rhs-index)))
+                (Cast (Int 32 tot-lanes) (Load (UIntOrInt lhs-signed 8 tot-lanes) lhs-name lhs-index)) 
+                (Cast (Int 32 tot-lanes) (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index)))
             )
         mat))
     (= out-lanes (* x-lanes y-lanes))
@@ -195,16 +199,17 @@
                         (Broadcast rhs-r-stride 4) 
                         (/ r-lanes 4)
                         )
-                  (Broadcast (IntImm32 4) r-lanes)
+                  ; (Broadcast (IntImm32 4) r-lanes)
+                  (Broadcast rhs-stride-1 r-lanes)
                   y-lanes
             )
             x-lanes
         )
     )
 ) (
-    (let new-lhs (Call "tile_load" (UIntOrInt signed 8 1024) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
-    (let new-rhs (Call "tile_load" (UIntOrInt signed 8 1024) (vec-of (IntImm16 (/ r-lanes 4)) (IntImm16 (* y-lanes 4)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
-    (let new-e (Call "tile_matmul" (UIntOrInt signed 32 256) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 (/ r-lanes 4)) mat new-lhs new-rhs)))
+    (let new-lhs (Call "tile_load" (UIntOrInt lhs-signed 8 1024) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
+    (let new-rhs (Call "tile_load" (UIntOrInt rhs-signed 8 1024) (vec-of (IntImm16 (/ r-lanes 4)) (IntImm16 (* y-lanes 4)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+    (let new-e (Call "tile_matmul" (Int 32 256) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 (/ r-lanes 4)) mat new-lhs new-rhs)))
     (union e new-e)
 ))
 
@@ -235,7 +240,8 @@
                         (Broadcast rhs-r-stride 2)
                         (/ r-lanes 2)
                         )
-                  (Broadcast (IntImm32 2) r-lanes)
+                  ; (Broadcast (IntImm32 2) r-lanes)
+                  (Broadcast rhs-stride-1 r-lanes)
                   y-lanes
             )
             x-lanes
@@ -249,9 +255,29 @@
 ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Helpers
+;; Constant folding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(rewrite (Bop (Add) (IntImm bits a) (IntImm bits b)) (IntImm bits (+ a b)))
+(rewrite (Bop (Sub) (IntImm bits a) (IntImm bits b)) (IntImm bits (- a b)))
+(rewrite (Bop (Mul) (IntImm bits a) (IntImm bits b)) (IntImm bits (* a b)))
+(rewrite (Bop (Div) (IntImm bits a) (IntImm bits b)) (IntImm bits (/ a b)))
+(rewrite (Bop (Mod) (IntImm bits a) (IntImm bits b)) (IntImm bits (% a b)))
+(rewrite (Bop (Min) (IntImm bits a) (IntImm bits b)) (IntImm bits (min a b)))
+(rewrite (Bop (Max) (IntImm bits a) (IntImm bits b)) (IntImm bits (max a b)))
+(rewrite (Bop (EQ) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((= a b)))
+(rewrite (Bop (EQ) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((!= a b)))
+(rewrite (Bop (NE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((= a b)))
+(rewrite (Bop (NE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((!= a b)))
+(rewrite (Bop (LT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((< a b)))
+(rewrite (Bop (LT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((>= a b)))
+(rewrite (Bop (LE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((<= a b)))
+(rewrite (Bop (LE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((> a b)))
+(rewrite (Bop (GT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((> a b)))
+(rewrite (Bop (GT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((<= a b)))
+(rewrite (Bop (GE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((>= a b)))
+(rewrite (Bop (GE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((< a b)))
+; TODO: logical operators
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Axiomatic rewrites
@@ -279,16 +305,46 @@
          (Broadcast (Bop bop a (Broadcast b (/ l2 l1))) l1)
     :when ((< l1 l2)
            (= 0 (% l2 l1))))
+
+(rewrite (Bop bop (Broadcast a l1) (Ramp x s l2))
+         (Bop bop (Broadcast (Broadcast a (/ l1 l2)) l2) (Ramp x s l2))
+    :when ((> l1 l2)
+           (= 0 (% l1 l2))))
+
+(rewrite (Bop bop (Ramp x s l2) (Broadcast a l1))
+         (Bop bop (Ramp x s l2) (Broadcast (Broadcast a (/ l1 l2)) l2))
+    :when ((> l1 l2)
+           (= 0 (% l1 l2))))
+
+
 (rewrite (Bop bop (Broadcast a l) (Broadcast b l))
          (Broadcast (Bop bop a b) l))
 
+(rewrite (Bop add-or-sub (Ramp base stride lanes) (Broadcast x lanes))
+         (Ramp (Bop (Add) base x) stride lanes)
+    :when ((AddOrSub add-or-sub)))
+(rewrite (Bop add-or-sub (Ramp b1 s1 l) (Ramp b2 s2 l))
+         (Ramp (Bop add-or-sub b1 b2) (Bop add-or-sub s1 s2) l)
+    :when ((AddOrSub add-or-sub)))
+(rewrite (Bop (Mul) (Ramp b s l) (Broadcast x l))
+         (Ramp (Bop (Mul) b x) (Bop (Mul) s x) l))
 
-(rewrite (Bop bop (Ramp base stride lanes) (Broadcast x lanes))
-         (Ramp (Bop bop base x) stride lanes))
+; TODO: this can be generalized
+(rewrite (Bop (Mod) (Ramp (IntImm bits base) (IntImm bits 1) lanes) (Broadcast (IntImm bits x) lanes))
+         (Broadcast (Ramp (IntImm bits 0) (IntImm bits 1) x) (/ lanes x))
+    :when ((= (% lanes x) 0)
+           (= (% base x) 0)))
+; (0:1:8) / x8(4) -> (x4(0):x4(1):2)
+(rewrite (Bop (Div) (Ramp (IntImm bits base) (IntImm bits 1) lanes) (Broadcast (IntImm bits x) lanes))
+         (Ramp (Broadcast (IntImm bits (/ base x)) x) (Broadcast (IntImm bits 1) x) (/ lanes x))
+        :when ((= (% lanes x) 0)
+               (= (% base x) 0)))
 
-(rewrite (Bop bop (Ramp base stride r-lanes) (Broadcast x b-lanes))
-         (Ramp (Bop bop base (Broadcast x (/ b-lanes r-lanes))) stride r-lanes)
-    :when ((= 0 (% b-lanes r-lanes))))
+
+(rewrite (Bop add-or-sub (Ramp base stride r-lanes) (Broadcast x b-lanes))
+         (Ramp (Bop add-or-sub base (Broadcast x (/ b-lanes r-lanes))) stride r-lanes)
+    :when ((= 0 (% b-lanes r-lanes))
+           (AddOrSub add-or-sub) ))
 (rewrite (Ramp x s 1) x)
 
 (rewrite x (Ramp x (Broadcast (IntImm b 0) l) 1) 
@@ -303,6 +359,7 @@
 (rewrite (Ramp e (IntImm b 1) l) 
          (Ramp (Ramp e (IntImm b 1) 2) (Broadcast (IntImm b 2) 2) (/ l 2)) 
   :when ((= 0 (% l 2))))
+
 
 
 
