@@ -24,6 +24,7 @@ tests(GROUPS performance
       realize_overhead.cpp
       rgb_interleaved.cpp
       tiled_matmul.cpp
+      interleave_benchmarking.cpp
       vectorize.cpp
       wrap.cpp
       )
