@@ -655,9 +655,9 @@ class ExtractTileOperations : public IRMutator {
             bool amx_synthesized = optimized.find("tile_matmul") != -1;
             if (!amx_synthesized) {
                 std::cerr << opvalue << "\n";
+            } else {
+                std::cerr << "amx synthesized\n";
             }
-            internal_assert(amx_synthesized) << "Oops";
-            std::cerr << "amx synthesized\n";
 
             return matmul.stmt;
         }
@@ -685,16 +685,8 @@ Stmt extract_tile_operations(const Stmt &s) {
 }
 
 std::string run_egglog(const std::string &prog) {
-    std::string header;
-// load header
-#include "egglog/instrsel.egg"
-
-    std::string schedule;
-#include "egglog/schedule.egg"
-
-    std::string binding = "(let prog " + prog + ")";
-
-    std::string egglog_prog = header + binding + schedule;
+#include "egglog/main.tmpl.h"
+    std::string egglog_prog = EGGLOG_PROG(prog);
 
     int pipe_stdin[2];
     int pipe_stdout[2];

@@ -1,0 +1,49 @@
+; prog +=  R"***(
+
+;; Type checking
+(function MultipliedLanes (Type i64) Type)
+(rewrite (MultipliedLanes (Int i l) x) (Int i (* l x)))
+(rewrite (MultipliedLanes (UInt i l) x) (UInt i (* l x)))
+(rewrite (MultipliedLanes (Float i l) x) (Float i (* l x)))
+(rewrite (MultipliedLanes (BFloat i l) x) (BFloat i (* l x)))
+(rewrite (MultipliedLanes (Handle l) x) (Handle (* l x)))
+
+(function LanesInType (Type) i64)
+(rewrite (LanesInType (Int i l)) l)
+(rewrite (LanesInType (UInt i l)) l)
+(rewrite (LanesInType (Float i l)) l)
+(rewrite (LanesInType (BFloat i l)) l)
+(rewrite (LanesInType (Handle l)) l)
+
+
+(relation has-type (Expr Type))
+(rule ((= e (Cast ty Expr))) ((has-type e ty)))
+(rule ((= e (Reinterpret ty Expr))) ((has-type e ty)))
+(rule (
+    (= e (Bop bop e1 e2))
+    (has-type e1 t)
+    (has-type e2 t)
+) ((has-type e t)))
+(rule ((= e (Select cond tval fval))
+    (has-type cond (UInt 1 _lanes))
+    (has-type tval ty)
+    (has-type fval ty)
+) ((has-type e ty)))
+(rule ((= e (Load ty name child))) ((has-type e ty)))
+(rule ((= e (Ramp child s l)) 
+    (has-type child ty)
+) ((has-type e (MultipliedLanes ty l))))
+(rule ((= e (Broadcast child l)) (has-type child ty)) 
+    ((has-type e (MultipliedLanes ty l))))
+(rule ((= e (Let x e1 e2))) 
+    ((panic "let not supported")))
+(rule ((= e (Call fn out-type args))
+) ((has-type e out-type)))
+(rule ((= e (Var ty x))) ((has-type e ty)))
+(rule ((= e (Shuffle VecExpr VecInt))) 
+    ((panic "not supported")))
+(rule ((= e (VectorReduce ty BinOp Expr))) 
+    ((has-type e ty)))
+(rule ((= e (IntImm bits i64))) ((has-type e (Int bits 1))))
+
+; )***"; prog += "\n";

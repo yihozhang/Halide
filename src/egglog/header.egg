@@ -1,0 +1,89 @@
+; prog +=  R"***(
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Datatype declarations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(datatype BinOp
+    (Add)
+    (Sub)
+    (Mul)
+    (Div)
+    (Mod)
+    (Min)
+    (Max)
+    (EQ)
+    (NE)
+    (LT)
+    (LE)
+    (GT)
+    (GE)
+    (And)
+    (Or))
+(datatype UnaOp
+    (Not))
+
+; TODO
+(datatype Buffer)
+(datatype Parameter)
+(datatype Type
+    ;;  bits x lanes
+    (Int i64 i64)
+    (UInt i64 i64)
+    (Float i64 i64)
+    (BFloat i64 i64)
+    (Handle i64)
+)
+
+; true if the type is signed
+(function UIntOrInt (bool i64 i64) Type)
+(birewrite (UIntOrInt false i l) (UInt i l))
+(birewrite (UIntOrInt true i l) (Int i l))
+
+(sort VecInt (Vec i64))
+(sort Expr)
+(sort VecExpr (Vec Expr))
+
+(function Cast (Type Expr) Expr)
+(function Reinterpret (Type Expr) Expr)
+(function Bop (BinOp Expr Expr) Expr)
+(function Uop (UnaOp Expr) Expr)
+;; condition true_val false_val
+(function Select (Expr Expr Expr) Expr)
+;; name index
+(function Load (Type String Expr) Expr)
+;; base stride lanes
+(function Ramp (Expr Expr i64) Expr :cost 100)
+;; value lanes
+(function Broadcast (Expr i64) Expr :cost 100)
+;; name value body
+;; TODO: Not sure if we need this one, binding is tricky
+(function Let (String Expr Expr) Expr)
+;; This one is also tricky
+(function Call (String Type VecExpr) Expr)
+;; name
+;; TODO: there are some arguments that are ignored here
+(function Var (Type String) Expr)
+(function Shuffle (VecExpr VecInt) Expr)
+(function VectorReduce (Type BinOp Expr) Expr)
+;;                bits val
+(function IntImm (i64  i64) Expr)
+; u64 is not supported in egglog
+(function UIntImm (i64  i64) Expr)
+(function FloatImm (i64 f64) Expr)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Helpers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(function IntImm64 (i64) Expr)
+(birewrite (IntImm64 x) (IntImm 64 x))
+(function IntImm32 (i64) Expr)
+(birewrite (IntImm32 x) (IntImm 32 x))
+(function IntImm16 (i64) Expr)
+(birewrite (IntImm16 x) (IntImm 16 x))
+
+(let int64x1 (Int 64 1))
+
+
+; )***"; prog += "\n";
+

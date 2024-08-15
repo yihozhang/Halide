@@ -1,0 +1,85 @@
+
+; prog +=  R"***(
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Axiomatic rewrites
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(rewrite 
+    (Broadcast (Broadcast x l0) l1)
+    (Broadcast x (* l0 l1))
+)
+
+(rewrite (Bop bop a b) (Bop bop b a) :when ((CommBop bop)))
+
+(rewrite (Broadcast x 1) x)
+(rewrite (Broadcast (Load type name index) lanes) 
+         (Load (MultipliedLanes type lanes) name (Broadcast index lanes)))
+(rewrite (Broadcast (Cast type expr) lanes) 
+         (Cast (MultipliedLanes type lanes) (Broadcast expr lanes)))
+
+(rewrite (Bop bop (Broadcast a l1) (Broadcast b l2))
+         (Broadcast (Bop bop (Broadcast a (/ l1 l2)) b) l2)
+    :when ((> l1 l2)
+           (= 0 (% l1 l2))))
+
+(rewrite (Bop bop (Broadcast a l1) (Broadcast b l2))
+         (Broadcast (Bop bop a (Broadcast b (/ l2 l1))) l1)
+    :when ((< l1 l2)
+           (= 0 (% l2 l1))))
+
+(rewrite (Bop bop (Broadcast a l1) (Ramp x s l2))
+         (Bop bop (Broadcast (Broadcast a (/ l1 l2)) l2) (Ramp x s l2))
+    :when ((> l1 l2)
+           (= 0 (% l1 l2))))
+
+(rewrite (Bop bop (Ramp x s l2) (Broadcast a l1))
+         (Bop bop (Ramp x s l2) (Broadcast (Broadcast a (/ l1 l2)) l2))
+    :when ((> l1 l2)
+           (= 0 (% l1 l2))))
+
+
+(rewrite (Bop bop (Broadcast a l) (Broadcast b l))
+         (Broadcast (Bop bop a b) l))
+
+(rewrite (Bop add-or-sub (Ramp base stride lanes) (Broadcast x lanes))
+         (Ramp (Bop (Add) base x) stride lanes)
+    :when ((AddOrSub add-or-sub)))
+(rewrite (Bop add-or-sub (Ramp b1 s1 l) (Ramp b2 s2 l))
+         (Ramp (Bop add-or-sub b1 b2) (Bop add-or-sub s1 s2) l)
+    :when ((AddOrSub add-or-sub)))
+(rewrite (Bop (Mul) (Ramp b s l) (Broadcast x l))
+         (Ramp (Bop (Mul) b x) (Bop (Mul) s x) l))
+
+; TODO: this can be generalized
+(rewrite (Bop (Mod) (Ramp (IntImm bits base) (IntImm bits 1) lanes) (Broadcast (IntImm bits x) lanes))
+         (Broadcast (Ramp (IntImm bits 0) (IntImm bits 1) x) (/ lanes x))
+    :when ((= (% lanes x) 0)
+           (= (% base x) 0)))
+; (0:1:8) / x8(4) -> (x4(0):x4(1):2)
+(rewrite (Bop (Div) (Ramp (IntImm bits base) (IntImm bits 1) lanes) (Broadcast (IntImm bits x) lanes))
+         (Ramp (Broadcast (IntImm bits (/ base x)) x) (Broadcast (IntImm bits 1) x) (/ lanes x))
+        :when ((= (% lanes x) 0)
+               (= (% base x) 0)))
+
+
+(rewrite (Bop add-or-sub (Ramp base stride r-lanes) (Broadcast x b-lanes))
+         (Ramp (Bop add-or-sub base (Broadcast x (/ b-lanes r-lanes))) stride r-lanes)
+    :when ((= 0 (% b-lanes r-lanes))
+           (AddOrSub add-or-sub) ))
+(rewrite (Ramp x s 1) x)
+
+(rewrite x (Ramp x (Broadcast (IntImm b 0) l) 1) 
+    :when (
+        (IsExpr x) 
+        (has-type x (Int b l))))
+(rewrite x (Broadcast x 1) :when ((IsExpr x)))
+; reorganize a ramp as a 4-column tiles
+(rewrite (Ramp e (IntImm b 1) l) 
+         (Ramp (Ramp e (IntImm b 1) 4) (Broadcast (IntImm b 4) 4) (/ l 4)) 
+  :when ((= 0 (% l 4))))
+(rewrite (Ramp e (IntImm b 1) l) 
+         (Ramp (Ramp e (IntImm b 1) 2) (Broadcast (IntImm b 2) 2) (/ l 2)) 
+  :when ((= 0 (% l 2))))
+
+; )***"; prog += "\n";
