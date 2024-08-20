@@ -1,6 +1,6 @@
 auto EGGLOG_PROG = [](std::string src) {
     std::string prog;
-#include "header.egg"
+#include "definition.egg"
 #include "analysis/common.egg"
 #include "analysis/typechecking.egg"
 #include "optimization/axiom.egg"

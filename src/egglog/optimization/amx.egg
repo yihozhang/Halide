@@ -1,18 +1,61 @@
 ; prog +=  R"***(
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Emitting rules
+;; AMX helpers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; {
+    (relation _LoadAMXType (Type))
+    (_LoadAMXType (Int 32 256))
+    (_LoadAMXType (Float 32 256))
+;; }
+(function LoadAMX (Type String) Expr)
+(birewrite (LoadAMX ty x) (Load ty x R256) :when ((_LoadAMXType ty)))
+
+(function StoreAMX (String Expr) Stmt)
+(birewrite (Store name value R256) (StoreAMX name value))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Shape inference
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;                       var    rows colbytes
+(relation AMXAllocation (String i64  i64))
+(relation AMXShape (Expr i64  i64))
+
+(rule (
+    (AMXAllocation name rows colbytes)
+    (= e (Var t name))
+) (
+    (AMXShape e rows colbytes)
+))
+(rule (
+    (AMXShape e rows colbytes)
+    (StoreAMX name e)
+) (
+    (AMXAllocation name rows colbytes)
+))
+(rule (
+    (AMXAllocation name rows colbytes)
+    (StoreAMX name e)
+) (
+    (AMXShape e rows colbytes)
+))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tile_matmul
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Int8/UInt8
 (rule (
-    (= e (Bop (Add) 
-        (VectorReduce (Int 32 out-lanes) (Add) 
-            (Bop (Mul) 
-                (Cast (Int 32 tot-lanes) (Load (UIntOrInt lhs-signed 8 tot-lanes) lhs-name lhs-index)) 
-                (Cast (Int 32 tot-lanes) (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index)))
-            )
-        mat))
+    (= e (Mem2AMX
+        (Bop (Add) 
+            (VectorReduce (Int 32 out-lanes) (Add) 
+                (Bop (Mul) 
+                    (Cast (Int 32 tot-lanes) (Load (UIntOrInt lhs-signed 8 tot-lanes) lhs-name lhs-index)) 
+                    (Cast (Int 32 tot-lanes) (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index)))
+                )
+            mat)))
     (= out-lanes (* x-lanes y-lanes))
     (= tot-lanes (* out-lanes r-lanes))
 
@@ -32,8 +75,7 @@
                         (Broadcast rhs-r-stride 4) 
                         (/ r-lanes 4)
                         )
-                  ; (Broadcast (IntImm32 4) r-lanes)
-                  (Broadcast rhs-stride-1 r-lanes)
+                  (Broadcast (IntImm32 4) r-lanes)
                   y-lanes
             )
             x-lanes
@@ -48,13 +90,14 @@
 
 ; BFloat16
 (rule (
-    (= e (Bop (Add) 
+    (= e (Mem2AMX
+        (Bop (Add) 
         (VectorReduce (Float 32 out-lanes) (Add) 
             (Bop (Mul) 
                 (Cast (Float 32 tot-lanes) (Load (BFloat 16 tot-lanes) lhs-name lhs-index)) 
                 (Cast (Float 32 tot-lanes) (Load (BFloat 16 tot-lanes) rhs-name rhs-index)))
             )
-        mat))
+        mat)))
     (= out-lanes (* x-lanes y-lanes))
     (= tot-lanes (* out-lanes r-lanes))
 
@@ -73,8 +116,7 @@
                         (Broadcast rhs-r-stride 2)
                         (/ r-lanes 2)
                         )
-                  ; (Broadcast (IntImm32 2) r-lanes)
-                  (Broadcast rhs-stride-1 r-lanes)
+                  (Broadcast (IntImm32 2) r-lanes)
                   y-lanes
             )
             x-lanes
@@ -85,6 +127,130 @@
     (let new-rhs (Call "tile_load" (BFloat 16 512) (vec-of (IntImm16 (/ r-lanes 2)) (IntImm16 (* y-lanes 2)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
     (let new-e (Call "tile_matmul" (Float 32 256) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 (/ r-lanes 4)) mat new-lhs new-rhs)))
     (union e new-e)
+))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tilezero
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(rule (
+    (= e (Mem2AMX
+        (Broadcast
+            (UIntOrIntImm _sign 32 0)
+            lanes
+        )))
+    (AMXShape e rows colbytes)
+) (
+    (let new-e (Call "tile_zero" (Int 32 256) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
+    (union e new-e)
+))
+
+(rule (
+    (= e (Mem2AMX
+        (Broadcast
+            (FloatImm 32 0.0)
+            lanes
+        )))
+    (AMXShape e rows colbytes)
+) (
+    (let new-e (Call "tile_zero" (Float 32 256) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
+    (union e new-e)
+))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tile_load
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; there are two ways to translate an Mem2AMX:
+;; We can use AMXStoreAndLoad followed by an tileload,
+;; Or if the argument to Mem2AMX is a load of a specific pattern,
+;; then we can just to a tileload
+
+; The generic case
+
+(rule (
+    (= e (Mem2AMX value))
+    ; We need to know the shape of the computation 
+    ; before loading it
+    (AMXShape e row colbytes)
+    (has-type value (UIntOrInt _sign 8 _lanes))
+) (
+    (let new-e (Call "tile_load" (Int 8 1024)
+                   (vec-of (IntImm16 row)
+                           (IntImm16 colbytes)
+                           (StoreAndLoad value)
+                           (Computed)
+                           (Computed))))
+    (union e new-e)
+))
+
+(rule (
+    (= e (Mem2AMX value))
+    ; We need to know the shape of the computation 
+    ; before loading it
+    (AMXShape e row colbytes)
+    (has-type value (Float 32 _lanes))
+) (
+    (let new-e (Call "tile_load" (Float 32 256)
+                   (vec-of (IntImm16 row)
+                           (IntImm16 colbytes)
+                           (StoreAndLoad value)
+                           (Computed)
+                           (Computed))))
+    (union e new-e)
+))
+
+; The specialized case
+
+(rule (
+    (= e (Mem2AMX
+        (Load ty name index)))
+    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) n-stride n-lanes))
+    (= ty (UIntOrInt _sign 8 _lanes))
+) (
+    (let new-e (Call "tile_load" (Int 8 1024) (vec-of (IntImm16 n-lanes) (IntImm16 m-lanes) (Var (Handle 1) name) base n-stride)))
+    (union e new-e)
+))
+
+(rule (
+    (= e (Mem2AMX
+        (Load ty name index)))
+    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) n-stride n-lanes))
+    (= ty (Float 16 _lanes))
+) (
+    (let new-e (Call "tile_load" (Int 16 512) (vec-of (IntImm16 n-lanes) (IntImm16 (* m-lanes 2)) (Var (Handle 1) name) base n-stride)))
+    (union e new-e)
+))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tile_store
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; there are two ways to translate an AMX2Mem:
+;; We can use AMXStoreAndLoad, which stores the
+;; AMX result in some contiguous memory and then load it,
+;; Or if the statement has the form (Store name (AMX2Mem value) index),
+;; and the index has a specific pattern, then we can directly tile_store it.
+
+(rewrite (AMX2Mem value) (AMXStoreAndLoad value))
+
+(rule (
+    (= s (Store store-name (AMX2Mem value) index))
+    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) n-stride n-lanes))
+    (= bytes 4)
+    (has-type value ty)
+) (
+    (let tile (LoadAMX ty store-name))
+    (let new-s (Evaluate 
+        (Call "tile_store" (Int 32 1) 
+            (vec-of (IntImm16 n-lanes) 
+                    (IntImm16 (* m-lanes bytes))
+                    (Var (Handle 1) store-name)
+                    (Bop (Mul) base (IntImm32 bytes))
+                    (Bop (Mul) n-stride (IntImm32 bytes))
+                    tile
+                    ))))
+    (union s new-s)
 ))
 
 ; )***"; prog += "\n";
