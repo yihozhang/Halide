@@ -113,17 +113,11 @@ LLVM_CXX_FLAGS += -DLLVM_VERSION=$(LLVM_VERSION_TIMES_10)
 WITH_X86 ?= $(findstring x86, $(LLVM_COMPONENTS))
 WITH_ARM ?= $(findstring arm, $(LLVM_COMPONENTS))
 WITH_HEXAGON ?= $(findstring hexagon, $(LLVM_COMPONENTS))
-ifeq ($(shell test $(LLVM_VERSION_TIMES_10) -ge 170; echo $$?),0)
 WITH_RISCV ?= $(findstring riscv, $(LLVM_COMPONENTS))
-else
-# leave WITH_RISCV undefined
-endif
 WITH_AARCH64 ?= $(findstring aarch64, $(LLVM_COMPONENTS))
 WITH_POWERPC ?= $(findstring powerpc, $(LLVM_COMPONENTS))
 WITH_NVPTX ?= $(findstring nvptx, $(LLVM_COMPONENTS))
 WITH_WEBASSEMBLY ?= $(findstring webassembly, $(LLVM_COMPONENTS))
-# AMDGPU target is WIP
-WITH_AMDGPU ?= $(findstring amdgpu, $(LLVM_COMPONENTS))
 WITH_OPENCL ?= not-empty
 WITH_METAL ?= not-empty
 WITH_D3D12 ?= not-empty
@@ -150,10 +144,6 @@ POWERPC_LLVM_CONFIG_LIB=$(if $(WITH_POWERPC), powerpc, )
 PTX_CXX_FLAGS=$(if $(WITH_NVPTX), -DWITH_NVPTX, )
 PTX_LLVM_CONFIG_LIB=$(if $(WITH_NVPTX), nvptx, )
 PTX_DEVICE_INITIAL_MODULES=$(if $(WITH_NVPTX), libdevice.compute_20.10.bc libdevice.compute_30.10.bc libdevice.compute_35.10.bc, )
-
-AMDGPU_CXX_FLAGS=$(if $(WITH_AMDGPU), -DWITH_AMDGPU, )
-AMDGPU_LLVM_CONFIG_LIB=$(if $(WITH_AMDGPU), amdgpu, )
-# TODO add bitcode files
 
 OPENCL_CXX_FLAGS=$(if $(WITH_OPENCL), -DWITH_OPENCL, )
 OPENCL_LLVM_CONFIG_LIB=$(if $(WITH_OPENCL), , )
@@ -217,7 +207,6 @@ CXX_FLAGS += $(D3D12_CXX_FLAGS)
 CXX_FLAGS += $(WEBGPU_CXX_FLAGS)
 CXX_FLAGS += $(POWERPC_CXX_FLAGS)
 CXX_FLAGS += $(EXCEPTIONS_CXX_FLAGS)
-CXX_FLAGS += $(AMDGPU_CXX_FLAGS)
 CXX_FLAGS += $(RISCV_CXX_FLAGS)
 CXX_FLAGS += $(SPIRV_CXX_FLAGS)
 CXX_FLAGS += $(VULKAN_CXX_FLAGS)
@@ -252,7 +241,6 @@ LLVM_STATIC_LIBFILES = \
 	$(AARCH64_LLVM_CONFIG_LIB) \
 	$(POWERPC_LLVM_CONFIG_LIB) \
 	$(HEXAGON_LLVM_CONFIG_LIB) \
-	$(AMDGPU_LLVM_CONFIG_LIB) \
 	$(SPIRV_LLVM_CONFIG_LIB) \
 	$(VULKAN_LLVM_CONFIG_LIB) \
 	$(WEBASSEMBLY_LLVM_CONFIG_LIB) \
@@ -596,6 +584,7 @@ SOURCE_FILES = \
   StripAsserts.cpp \
   Substitute.cpp \
   Target.cpp \
+  TargetQueryOps.cpp \
   Tracing.cpp \
   TrimNoOps.cpp \
   Tuple.cpp \
@@ -782,6 +771,7 @@ HEADER_FILES = \
   StripAsserts.h \
   Substitute.h \
   Target.h \
+  TargetQueryOps.h \
   Tracing.h \
   TrimNoOps.h \
   Tuple.h \
