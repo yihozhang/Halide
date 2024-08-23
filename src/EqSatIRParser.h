@@ -22,6 +22,7 @@ public:
     int parse_int();
     double parse_double();
     std::vector<Expr> parse_vec_expr();
+    Stmt parse_stmt();
 
 private:
     std::string prog;
@@ -57,9 +58,6 @@ private:
         }
     }
 };
-
-// TODO: move this to its own file
-std::string run_egglog(const std::string& prog);
 
 }  // namespace Internal
 

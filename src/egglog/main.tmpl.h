@@ -1,4 +1,4 @@
-auto EGGLOG_PROG = [](std::string src) {
+auto EGGLOG_PROG = [](std::vector<std::pair<std::string, std::string>>&& bindings) {
     std::string prog;
 #include "definition.egg"
 #include "analysis/common.egg"
@@ -6,7 +6,14 @@ auto EGGLOG_PROG = [](std::string src) {
 #include "optimization/axiom.egg"
 #include "optimization/constant_folding.egg"
 #include "optimization/amx.egg"
-    prog += "(let prog " + src + ")";
+    for (auto [name, src] : bindings) {
+        prog += "(let " + name + " " + src + ")\n";
+    }
+    
 #include "schedule.egg"
+
+    for (auto [name, _src] : bindings) {
+        prog += "(extract " + name + ")\n";
+    }
     return prog;
 };

@@ -170,7 +170,23 @@ void EqSatIRPrinter::visit(const VectorReduce *e) {
     printArgs(stream, "VectorReduce", TYPE_ARG(e->type), "(Add)", EXPR_ARG(e->value));
 }
 
+void EqSatIRPrinter::visit(const MemToAMX *e) {
+    printArgs(stream, "Mem2AMX", EXPR_ARG(e->expr));
+}
+
+void EqSatIRPrinter::visit(const AMXToMem *e) {
+    printArgs(stream, "AMX2Mem", EXPR_ARG(e->expr));
+}
+
+void EqSatIRPrinter::visit(const Store *e) {
+    printArgs(stream, "Store", NAME_ARG(e->name), EXPR_ARG(e->index), EXPR_ARG(e->value));
+}
+
 void EqSatIRPrinter::print(const Expr &e) {
+    e.accept(this);
+}
+
+void EqSatIRPrinter::print(const Stmt &e) {
     e.accept(this);
 }
 

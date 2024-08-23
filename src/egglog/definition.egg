@@ -40,6 +40,7 @@
 (sort Expr)
 (sort VecExpr (Vec Expr))
 
+;; Expr
 (function Cast (Type Expr) Expr)
 (function Reinterpret (Type Expr) Expr)
 (function Bop (BinOp Expr Expr) Expr)
@@ -70,9 +71,27 @@
 
 
 ;; Stmt
+
 ;;                name  value index
 (function Store (String Expr  Expr) Stmt)
 (function Evaluate (Expr) Stmt)
+
+
+;; Some secondary stmts that we may not use
+;; Not supported: Provide, Realize, Acquire, Prefetch, HoistedStorage
+
+;; TODO: MemoryType, ForType, Partition, DeviceAPI
+; (function LetStmt (String Expr Stmt) Stmt)
+; (function AssertStmt (Expr Expr) Stmt)
+; (function ProducerConsumer (String bool Stmt) Stmt)
+; ;;                 name    type mem_type   extents cond body 
+; (function Allocate (String Type MemoryType VecExpr Expr Stmt) Stmt)
+; (function Free (String) Stmt)
+; (function Block (Stmt Stmt) Stmt)
+; (function Fork (Stmt Stmt) Stmt)
+; (function IfThenElse (Expr Stmt Stmt) Stmt)
+; (function For (String Expr Expr ForType Partition DeviceAPI Stmt) Stmt)
+; (function Atomic (String String Stmt) Stmt)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extensions to the IR

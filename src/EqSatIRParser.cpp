@@ -2,11 +2,11 @@
 #include "IR.h"
 #include "IROperator.h"
 
-#define BOP_CASE(op) \
-    if (is_head(#op)) { \
-        expect(')'); \
-        auto lhs = parse_expr(); \
-        auto rhs = parse_expr(); \
+#define BOP_CASE(op)               \
+    if (is_head(#op)) {            \
+        expect(')');               \
+        auto lhs = parse_expr();   \
+        auto rhs = parse_expr();   \
         return op::make(lhs, rhs); \
     }
 
@@ -74,8 +74,7 @@ Expr EqSatIRParser::parse_expr() {
         auto expr = parse_expr();
         result = VectorReduce::make(VectorReduce::Operator::Add, expr, type.lanes());
     } else if (is_head("Shuffle")) {
-
-    
+        internal_error << "Shuffle not supported\n";
     } else if (is_head("IntImm")) {
         auto bits = parse_int();
         auto value = parse_int();
@@ -88,6 +87,8 @@ Expr EqSatIRParser::parse_expr() {
         auto bits = parse_int();
         auto value = parse_double();
         result = FloatImm::make(Float(bits), value);
+    } else if (is_head("error")) {
+        internal_error << "Error expression\n";
     } else {
         internal_error << "Unknown expression at " << std::to_string(curr);
     }
@@ -186,6 +187,24 @@ std::vector<Expr> EqSatIRParser::parse_vec_expr() {
     while (!is_head(")")) {
         result.push_back(parse_expr());
     }
+    return result;
+}
+
+Stmt EqSatIRParser::parse_stmt() {
+    expect('(');
+
+    Stmt result;
+    if (is_head("Store")) {
+        auto name = parse_str();
+        auto value = parse_expr();
+        auto index = parse_expr();
+        result = Store::make(name, value, index, Parameter(), const_true(value.type().lanes()), ModulusRemainder());
+    } else if (is_head("error")) {
+        internal_error << "Error expression\n";
+    } else {
+        internal_error << "Unknown expression at " << std::to_string(curr);
+    }
+    expect(')');
     return result;
 }
 

@@ -8,10 +8,12 @@
 #include "Util.h"
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <sys/fcntl.h>
 #include <unistd.h>
+#include <unordered_set>
 
 /** \file Support extraction of AMX instructions. */
 
@@ -642,22 +644,6 @@ class ExtractTileOperations : public IRMutator {
             found_tile_x = matmul.tile_x;
             found_tile_y = matmul.tile_y;
             found_tile_r = matmul.tile_r;
-            std::ostringstream oss1;
-            oss1 << op->value;
-            std::ostringstream oss;
-            EqSatIRPrinter sprinter(oss);
-            sprinter.print(op->value);
-            auto egglog_prog = oss.str();
-
-            auto optimized = run_egglog(egglog_prog);
-            EqSatIRParser parser(optimized);
-            auto opvalue = parser.parse_expr();
-            bool amx_synthesized = optimized.find("tile_matmul") != -1;
-            if (!amx_synthesized) {
-                std::cerr << opvalue << "\n";
-            } else {
-                std::cerr << "amx synthesized\n";
-            }
 
             return matmul.stmt;
         }
@@ -678,15 +664,142 @@ class ExtractTileOperations : public IRMutator {
     }
 };
 
+// The only case we need to insert an AMXToMem node is when we are loading to an AMX tile
+// The only case we need to insert a MemToAMX node is when we are storing to an AMX tile
+class AnnotateDataMovement : public IRMutator {
+    using IRMutator::visit;
+
+public:
+    AnnotateDataMovement() = default;
+
+protected:
+    std::vector<string> amx_vars;
+
+    Stmt visit(const Allocate *allocate) override {
+        if (allocate->memory_type == MemoryType::AMXTile) {
+            user_assert(
+                (allocate->type.is_int() && allocate->type.bits() == 32) ||
+                (allocate->type.is_float() && allocate->type.bits() == 32))
+                << "scheduled tile operations must yield 32-bit integers or 32-bit floats";
+
+            std::vector<string> curr_amx_vars(this->amx_vars);
+            curr_amx_vars.push_back(allocate->name);
+            ScopedValue<vector<string>> old_amx_name(amx_vars, std::move(curr_amx_vars));
+            return IRMutator::visit(allocate);
+        } else {
+            return IRMutator::visit(allocate);
+        }
+    }
+
+    Expr visit(const Load *load) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), load->name) != amx_vars.end()) {
+            return AMXToMem::make(load);
+        } else {
+            return load;
+        }
+    }
+
+    Stmt visit(const Store *store) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), store->name) != amx_vars.end()) {
+            Expr value = MemToAMX::make(mutate(store->value));
+            // There should not be a Load in places other than value,
+            // so we don't need to mutate them.
+            return Store::make(store->name, value, store->index, store->param, store->predicate, store->alignment);
+        } else {
+            return IRMutator::visit(store);
+        }
+    }
+};
+
+std::string PLACEHOLDER_PREFIX = "collect_stores_placeholder_";
+
+struct CollectStores : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+    std::map<std::string, Stmt> stores;
+
+    Stmt visit(const Store *op) override {
+        auto no = stores.size();
+        auto placeholder = PLACEHOLDER_PREFIX + std::to_string(no);
+        stores[placeholder] = op;
+        return Store::make(placeholder, op->value, op->index, op->param, op->predicate, op->alignment);
+    }
+};
+
+struct SubstStores : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+    const std::map<std::string, Stmt> &stores;
+
+    SubstStores(std::map<std::string, Stmt> &&stores)
+        : stores(stores) {
+    }
+
+    Stmt visit(const Store *op) override {
+        internal_assert(op->name.find(PLACEHOLDER_PREFIX) == 0)
+            << "All stores should have been replaced with a place holder";
+        auto it = stores.find(op->name);
+        internal_assert(it != stores.end()) << "Store not found";
+        return it->second;
+    }
+};
+
 }  // namespace
 
 Stmt extract_tile_operations(const Stmt &s) {
     return ExtractTileOperations().mutate(s);
 }
 
-std::string run_egglog(const std::string &prog) {
+Stmt eqsat_extract_tile_operations(const Stmt &s) {
+    auto annotated_s = AnnotateDataMovement().mutate(s);
+    CollectStores collect_stores;
+    auto placeholder = collect_stores.mutate(annotated_s);
+    auto stores = std::move(collect_stores.stores);
+
+    std::vector<std::pair<std::string, std::string>> bindings;
+
+    for (const auto &[name, op] : stores) {
+        std::ostringstream oss;
+        EqSatIRPrinter sprinter(oss);
+        sprinter.print(op);
+        bindings.emplace_back(name, oss.str());
+    }
+
+    auto output = run_egglog(std::move(bindings));
+    auto optimized_programs = split_string(output, "\n");
+    bool amx_synthesized = false;
+    std::map<std::string, Stmt> new_stores;
+    for (int i = 0; i < optimized_programs.size(); i++) {
+        if (optimized_programs[i].empty()) {
+            continue;
+        }
+        auto &optimized = optimized_programs[i];
+        auto &name = bindings[i].first;
+        amx_synthesized = amx_synthesized || optimized.find("tile_matmul") != -1;
+
+        EqSatIRParser parser(optimized);
+        auto opvalue = parser.parse_stmt();
+
+        new_stores[name] = opvalue;
+    }
+    if (!amx_synthesized) {
+        std::cerr << "amx NOT synthesied\n";
+    } else {
+        std::cerr << "amx synthesized\n";
+    }
+    return SubstStores(std::move(new_stores)).mutate(placeholder);
+}
+
+std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&binding) {
 #include "egglog/main.tmpl.h"
-    std::string egglog_prog = EGGLOG_PROG(prog);
+
+    std::string egglog_prog = EGGLOG_PROG(std::move(binding));
+
+
+    std::string filename = "/tmp/egglog_prog_" + std::to_string(getpid()) + ".egg";
+    // Write the program to a file
+    std::cout << "Writing egglog program to " << filename << std::endl;
+    std::ofstream file(filename);
+    file << egglog_prog;
+
 
     int pipe_stdin[2];
     int pipe_stdout[2];
@@ -736,6 +849,33 @@ std::string run_egglog(const std::string &prog) {
 
     close(pipe_stdout[0]);
     return oss.str();
+}
+
+template<>
+void ExprNode<MemToAMX>::accept(IRVisitor *v) const {
+    EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
+    internal_assert(ev) << "MemToAMX can only be visited by EqSatIRVisitor\n";
+    ev->visit((const MemToAMX *)this);
+}
+template<>
+void ExprNode<AMXToMem>::accept(IRVisitor *v) const {
+    EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
+    internal_assert(ev) << "AMXToMem can only be visited by EqSatIRVisitor\n";
+    ev->visit((const AMXToMem *)this);
+}
+
+template<>
+Expr ExprNode<MemToAMX>::mutate_expr(IRMutator *v) const {
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "MemToAMX can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const MemToAMX *)this);
+}
+
+template<>
+Expr ExprNode<AMXToMem>::mutate_expr(IRMutator *v) const {
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "AMXToMem can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const AMXToMem *)this);
 }
 
 }  // namespace Internal

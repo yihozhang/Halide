@@ -424,7 +424,7 @@ void lower_impl(const vector<Function> &output_funcs,
 
     if (t.has_feature(Target::AVX512_SapphireRapids)) {
         debug(1) << "Extracting tile operations...\n";
-        s = extract_tile_operations(s);
+        s = eqsat_extract_tile_operations(s);
         log("Lowering after extracting tile operations:", s);
     }
 

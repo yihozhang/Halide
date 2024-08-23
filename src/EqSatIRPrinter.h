@@ -1,16 +1,18 @@
 #ifndef EQSAT_IR_PRINTER_H
 #define EQSAT_IR_PRINTER_H
 
-#include <iostream>
+#include "ExtractTileOperations.h"
+
+#include "IRPrinter.h"
 #include "IRVisitor.h"
 #include "Module.h"
 #include "Scope.h"
-#include "IRPrinter.h"
+#include <iostream>
 
 namespace Halide {
 namespace Internal {
 
-class EqSatIRPrinter : public IRVisitor {
+class EqSatIRPrinter : public EqSatIRVisitor {
 public:
     /** Construct an IRPrinter pointed at a given output stream
      * (e.g. std::cout, or a std::ofstream) */
@@ -18,11 +20,7 @@ public:
 
     /** emit an expression on the output stream */
     void print(const Expr &);
-
-    // /** emit a statement on the output stream */
-    // void print(const Stmt &);
-
-    // static void test();
+    void print(const Stmt &);
 
 protected:
     /** The stream on which we're outputting */
@@ -58,6 +56,9 @@ protected:
     void visit(const Call *) override;
     void visit(const Let *) override;
     void visit(const VectorReduce *) override;
+    void visit(const MemToAMX *) override;
+    void visit(const AMXToMem *) override;
+    void visit(const Store *) override;
 };
 
 }  // namespace Internal
