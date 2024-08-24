@@ -23,6 +23,10 @@ main_prog=$(sed "s/INPUT/$escaped_file_name/g" main.tmpl.egg)
 # find all the names after "(let " and format them as "(extract name)" for each name using sed
 extract_prog=$(sed -n 's/(let \([a-zA-Z0-9_]*\).*/\(extract \1\)/p' $file_name)
 
-prog="$main_prog\n$extract_prog"
+echo $extract_prog
+prog="$main_prog
+
+$extract_prog"
 
 printf '%s\n' "$prog" | egglog
+printf '%s\n' "$prog" > out.egg
