@@ -179,7 +179,7 @@ void EqSatIRPrinter::visit(const AMXToMem *e) {
 }
 
 void EqSatIRPrinter::visit(const Store *e) {
-    printArgs(stream, "Store", NAME_ARG(e->name), EXPR_ARG(e->index), EXPR_ARG(e->value));
+    printArgs(stream, "Store", NAME_ARG(e->name), EXPR_ARG(e->value), EXPR_ARG(e->index));
 }
 
 void EqSatIRPrinter::print(const Expr &e) {

@@ -15,10 +15,10 @@ namespace Internal {
 
 struct MemToAMX : public ExprNode<MemToAMX> {
     Expr expr;
-    static Expr make(Expr expr) {
+    static Expr make(Expr expr, Type type) {
         MemToAMX *node = new MemToAMX;
         node->expr = expr;
-        node->type = expr.type();
+        node->type = type;
         return node;
     }
     // This should not matter because MemToAMX is inserted only for the EqSat phase.
@@ -27,10 +27,10 @@ struct MemToAMX : public ExprNode<MemToAMX> {
 
 struct AMXToMem : public ExprNode<AMXToMem> {
     Expr expr;
-    static Expr make(Expr expr) {
+    static Expr make(Expr expr, Type type) {
         AMXToMem *node = new AMXToMem;
         node->expr = expr;
-        node->type = expr.type();
+        node->type = type;
         return node;
     }
     // This should not matter because MemToAMX is inserted only for the EqSat phase.
@@ -56,7 +56,7 @@ public:
         if (value.same_as(e->expr)) {
             return e;
         } else {
-            return MemToAMX::make(value);
+            return MemToAMX::make(value, e->type);
         }
     }
 
@@ -65,7 +65,7 @@ public:
         if (value.same_as(e->expr)) {
             return e;
         } else {
-            return AMXToMem::make(value);
+            return AMXToMem::make(value, e->type);
         }
     }
 };

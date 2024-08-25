@@ -199,6 +199,9 @@ Stmt EqSatIRParser::parse_stmt() {
         auto value = parse_expr();
         auto index = parse_expr();
         result = Store::make(name, value, index, Parameter(), const_true(value.type().lanes()), ModulusRemainder());
+    } else if (is_head("Evaluate")) {
+        auto expr = parse_expr();
+        result = Evaluate::make(expr);
     } else if (is_head("error")) {
         internal_error << "Error expression\n";
     } else {
