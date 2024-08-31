@@ -538,8 +538,6 @@ Stmt convert_to_zero(const Store *op, int tile_x, int tile_y, const string &new_
     return {};
 }
 
-
-// (Evaluate (Call "tile_store" (Int 32 1) (vec-of (IntImm16 6) (IntImm16 32) (Var (Handle 1) "matmul_global_wrapper$0") (Bop (Mul) (IntImm32 4) (Bop (Sub) (Bop (Add) (Bop (Mul) (Bop (Add) (Var (Int 32 1) "matmul_global_wrapper$0.min.1") (Var (Int 32 1) "matmul_global_wrapper$0.s0.x.mmxi.base.s")) (Var (Int 32 1) "matmul_global_wrapper$0.stride.1")) (Bop (Add) (Var (Int 32 1) "matmul_global_wrapper$0.min.0") (Var (Int 32 1) "matmul_global_wrapper$0.s0.y.mmyi.base.s"))) (Bop (Add) (Bop (Mul) (Var (Int 32 1) "matmul_global_wrapper$0.min.1") (Var (Int 32 1) "matmul_global_wrapper$0.stride.1")) (Var (Int 32 1) "matmul_global_wrapper$0.min.0")))) (Bop (Mul) (IntImm32 4) (Var (Int 32 1) "matmul_global_wrapper$0.stride.1")) (Load (Int 32 256) "matmul" (Ramp (IntImm32 0) (IntImm32 1) 256)))))
 Stmt convert_to_tile_store(const Store *op, const string &amx_name, int tile_x, int tile_y) {
     auto tile = get_2d_tile_index(op->index);
     if (tile.result && tile.extent[0] == tile_x && tile.extent[1] == tile_y) {
@@ -596,8 +594,8 @@ class ExtractTileOperations : public IRMutator {
                 body = mutate(body);
             }
 
-            auto alloc_type = amx_op_type_result_type(op_type);
-            return Allocate::make(amx_name, alloc_type, MemoryType::AMXTile, {1}, const_true(), body);
+            auto tile_type = amx_op_type_result_type(op_type);
+            return Allocate::make(amx_name, tile_type, MemoryType::AMXTile, {1}, const_true(), body);
         }
         return IRMutator::visit(op);
     }
@@ -680,27 +678,19 @@ protected:
     Stmt visit(const Allocate *op) override {
         if (op->memory_type == MemoryType::AMXTile) {
             user_assert(
-                (op->type.is_int() && op->type.bits() == 32) ||
-                (op->type.is_float() && op->type.bits() == 32))
-                << "scheduled tile operations must yield 32-bit integers or 32-bit floats";
+                (op->type.is_int_or_uint() && op->type.bits() == 32) ||
+                (op->type.is_float() && op->type.bits() == 32) ||
+                (op->type.is_int_or_uint() && op->type.bits() == 8) ||
+                (op->type.is_bfloat() && op->type.bits() == 16))
+                << "scheduled tile operations must yield 32-bit integers or 32-bit floats for output, 8-bit integers or 16-bit floats for input";
 
             std::vector<string> curr_amx_vars(this->amx_vars);
             curr_amx_vars.push_back(op->name);
-            ScopedValue<vector<string>> old_amx_name(amx_vars, std::move(curr_amx_vars));
-            // return IRMutator::visit(op);
+            ScopedValue<vector<string>> old_amx_vars(amx_vars, std::move(curr_amx_vars));
 
-            AMXOpType op_type;
-            if (op->type.is_int() && op->type.bits() == 32) {
-                op_type = AMXOpType::Int8;
-            } else {
-                op_type = AMXOpType::Bfloat16;
-            }
-            Stmt body = op->body;
+            Stmt body = mutate(op->body);
 
-            body = mutate(body);
-
-            auto alloc_type = amx_op_type_result_type(op_type);
-            return Allocate::make(op->name, alloc_type, MemoryType::AMXTile, {1}, const_true(), body);
+            return Allocate::make(op->name, op->type, MemoryType::AMXTile, op->extents, const_true(), body);
         } else {
             return IRMutator::visit(op);
         }
@@ -708,8 +698,8 @@ protected:
 
     Expr visit(const Load *load) override {
         if (std::find(amx_vars.begin(), amx_vars.end(), load->name) != amx_vars.end()) {
-            internal_assert(is_const_one(load->predicate)) << "Only constant predicate is supported";
-            return AMXToMem::make(Load::make(load->type.with_lanes(256), load->name, Ramp::make(0, 1, 256), load->image, load->param, const_true(256), load->alignment), load->type);
+            internal_assert(is_const_one(load->predicate)) << "Only constant predicate is supported in AMX";
+            return AMXToMem::make(load, load->type);
         } else {
             return load;
         }
@@ -717,11 +707,16 @@ protected:
 
     Stmt visit(const Store *store) override {
         if (std::find(amx_vars.begin(), amx_vars.end(), store->name) != amx_vars.end()) {
-            Expr value = MemToAMX::make(mutate(store->value), store->value.type().with_lanes(256));
-            // There should not be a Load in places other than value,
-            // so we don't need to mutate is_const_one(is_const_one(them.
+            // `Load` can only occur in store->value,
+            Expr value = MemToAMX::make(mutate(store->value), store->value.type());
             internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
-            return Store::make(store->name, value, Ramp::make(0, 1, 256), store->param, const_true(256), store->alignment);
+            return Store::make(
+                store->name,
+                value,
+                store->index,
+                store->param,
+                store->predicate,
+                store->alignment);
         } else {
             return IRMutator::visit(store);
         }
@@ -756,6 +751,120 @@ struct SubstStores : public EqSatIRMutator {
         auto it = stores.find(op->name);
         internal_assert(it != stores.end()) << "Store not found";
         return it->second;
+    }
+};
+
+Type convert_to_tile_type(Type type) {
+    Type tile_type;
+    if (type.is_bfloat() && type.bits() == 16) {
+        tile_type = BFloat(16, 512);
+    } else if (type.is_int() || type.is_uint() || type.is_float()) { // is_float() returns true for bfloat
+        tile_type = type.with_lanes(1024 / type.bytes());
+    } else {
+        internal_error << "Unsupported type for AMX tile";
+    }
+    return tile_type;
+}
+
+// The expression returned by EqSat, is not necessarily compatiable with the
+// runtime, since the runtime always views an AMX Tile as a 256-lane vector.
+class EnforceAMXShape : public IRMutator {
+    using IRMutator::visit;
+
+protected:
+    std::vector<string> amx_vars;
+    std::unordered_map<string, int> amx_tile_size;
+
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::AMXTile) {
+            std::vector<string> curr_amx_vars(this->amx_vars);
+            curr_amx_vars.push_back(op->name);
+            ScopedValue<vector<string>> old_amx_vars(amx_vars, std::move(curr_amx_vars));
+            auto body = mutate(op->body);
+            internal_assert(amx_tile_size.count(op->name)) << "AMX tile size not found";
+
+            auto tile_type = convert_to_tile_type(op->type);
+            return Allocate::make(op->name, tile_type, MemoryType::AMXTile, {amx_tile_size[op->name]}, const_true(), body);
+        } else {
+            return IRMutator::visit(op);
+        }
+    }
+
+    int get_nth_tile_from_tile_index(const Expr &e) {
+        const Ramp *ramp = e.as<Ramp>();
+        if (!ramp) {
+            internal_error << "AMX tile can only be indexed with ramp";
+            return -1;
+        }
+        int vec_length = ramp->lanes;
+        const int64_t *basep = as_const_int(ramp->base);
+        if (!basep) {
+            internal_error << "Only constant base is supported in AMX";
+            return -1;
+        }
+        int base = (int)*basep;
+        internal_assert(base % vec_length == 0) << "Cannot determine which AMX tile to load from";
+        return base / vec_length;
+    }
+
+    Expr visit(const Load *load) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), load->name) != amx_vars.end()) {
+            int tile = get_nth_tile_from_tile_index(load->index);
+            amx_tile_size[load->name] = std::max(amx_tile_size[load->name], tile + 1);
+            Type tile_type = convert_to_tile_type(load->type);
+            int tile_lanes = tile_type.lanes();
+            return Load::make(tile_type,
+                              load->name,
+                              Ramp::make(tile_lanes * tile, 1, tile_lanes),
+                              load->image,
+                              load->param,
+                              const_true(tile_lanes),
+                              load->alignment);
+        } else {
+            return load;
+        }
+    }
+
+    Stmt visit(const Store *store) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), store->name) != amx_vars.end()) {
+            internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
+            int tile = get_nth_tile_from_tile_index(store->index);
+            amx_tile_size[store->name] = std::max(amx_tile_size[store->name], tile + 1);
+            int tile_lanes = convert_to_tile_type(store->value.type()).lanes();
+
+            // There should not be a Load in places other than value,
+            // so we don't need to mutate them.
+            Expr value = mutate(store->value);
+            return Store::make(
+                store->name,
+                value,
+                Ramp::make(tile * tile_lanes, 1, tile_lanes),
+                store->param,
+                const_true(tile_lanes),
+                store->alignment);
+        } else {
+            return IRMutator::visit(store);
+        }
+    }
+
+    Expr visit(const Call *call) override {
+        // Not included:
+        // - tile_store since it returns a single value
+        vector<string> intrinsic_names = {"tile_load", "tile_matmul", "tile_zero"};
+
+        if (std::find(intrinsic_names.begin(), intrinsic_names.end(), call->name) != intrinsic_names.end()) {
+            return Call::make(
+                convert_to_tile_type(call->type),
+                call->name,
+                mutate(call->args),
+                call->call_type,
+                call->func,
+                call->value_index,
+                call->image,
+                call->param);
+        } else {
+            return IRMutator::visit(call);
+        }
     }
 };
 
@@ -803,6 +912,7 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
         std::cerr << "amx synthesized\n";
     }
     auto result = SubstStores(std::move(new_stores)).mutate(placeholder);
+    result = EnforceAMXShape().mutate(result);
     return result;
 }
 
@@ -811,13 +921,11 @@ std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&bindin
 
     std::string egglog_prog = EGGLOG_PROG(std::move(binding));
 
-
     std::string filename = "/tmp/egglog_prog_" + std::to_string(getpid()) + ".egg";
     // Write the program to a file
     std::cout << "Writing egglog program to " << filename << std::endl;
     std::ofstream file(filename);
     file << egglog_prog;
-
 
     int pipe_stdin[2];
     int pipe_stdout[2];

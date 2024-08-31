@@ -43,7 +43,7 @@
          (Broadcast (Bop bop a b) l))
 
 (rewrite (Bop add-or-sub (Ramp base stride lanes) (Broadcast x lanes))
-         (Ramp (Bop (Add) base x) stride lanes)
+         (Ramp (Bop add-or-sub base x) stride lanes)
     :when ((AddOrSub add-or-sub)))
 (rewrite (Bop add-or-sub (Ramp b1 s1 l) (Ramp b2 s2 l))
          (Ramp (Bop add-or-sub b1 b2) (Bop add-or-sub s1 s2) l)

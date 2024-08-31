@@ -5,12 +5,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; {
-    (relation _LoadAMXType (Type))
-    (_LoadAMXType (Int 32 256))
-    (_LoadAMXType (Float 32 256))
+    ; (relation _LoadAMXType (Type))
+    ; (_LoadAMXType (Int 32 256))
+    ; (_LoadAMXType (Float 32 256))
 ;; }
-(function LoadAMX (Type String) Expr :unextractable)
-(birewrite (LoadAMX ty x) (Load ty x R256) :when ((_LoadAMXType ty)))
+; (function LoadAMX (Type String) Expr :unextractable)
+; (birewrite (LoadAMX ty x) (Load ty x R256) :when ((_LoadAMXType ty)))
 
 ; (function StoreAMX (String Expr) Stmt :unextractable)
 ; (birewrite (Store name value R256) (StoreAMX name value))
@@ -46,28 +46,18 @@
 ;; tile_matmul
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Int8/UInt8
+;; Abstract AMX right-hand side access patterns
+
+(relation amx-int/uint-rhs (
+    Expr ;; orig-expr
+    i64 ;; x-lanes
+    i64 ;; y-lanes
+    i64 ;; r-lanes
+    Expr ;; rhs-expr
+))
+
 (rule (
-    (= e (Mem2AMX
-        (Bop (Add) 
-            (VectorReduce (Int 32 out-lanes) (Add) 
-                (Bop (Mul) 
-                    (Cast (Int 32 tot-lanes) (Load (UIntOrInt lhs-signed 8 tot-lanes) lhs-name lhs-index)) 
-                    (Cast (Int 32 tot-lanes) (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index)))
-                )
-            (AMX2Mem mat))))
-    (= out-lanes (* x-lanes y-lanes))
-    (= tot-lanes (* out-lanes r-lanes))
-
-    ;; LHS
-    (= lhs-index
-        (Ramp (Broadcast (Ramp lhs-base lhs-r-stride r-lanes) y-lanes) 
-              (Broadcast x-stride (* y-lanes r-lanes))
-              x-lanes)
-    )
-    (= lhs-r-stride (IntImm32 1))
-
-    ; RHS
+    (= orig-rhs (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index))
     (= rhs-index
         ; 4 is for (u)int8
         (Broadcast
@@ -82,35 +72,41 @@
         )
     )
 ) (
-    (let new-lhs (Call "tile_load" (UIntOrInt lhs-signed 8 1024) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
-    (let new-rhs (Call "tile_load" (UIntOrInt rhs-signed 8 1024) (vec-of (IntImm16 (/ r-lanes 4)) (IntImm16 (* y-lanes 4)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
-    (let new-e (Call "tile_matmul" (Int 32 256) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) mat new-lhs new-rhs)))
-    (AMXShape e x-lanes (* y-lanes 4))
-    (union e new-e)
+    (let amx-rhs (Call "tile_load" (UIntOrInt rhs-signed 8 (* r-lanes y-lanes)) (vec-of (IntImm16 (/ r-lanes 4)) (IntImm16 (* y-lanes 4)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+    (amx-int/uint-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
 ))
 
-; BFloat16
 (rule (
-    (= e (Mem2AMX
-        (Bop (Add) 
-        (VectorReduce (Float 32 out-lanes) (Add) 
-            (Bop (Mul) 
-                (Cast (Float 32 tot-lanes) (Load (BFloat 16 tot-lanes) lhs-name lhs-index)) 
-                (Cast (Float 32 tot-lanes) (Load (BFloat 16 tot-lanes) rhs-name rhs-index)))
+    (= orig-rhs-mem (AMX2Mem orig-rhs))
+    (= orig-rhs (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index))
+    (= rhs-index
+        ; 4 is for (u)int8
+        (Broadcast
+            (Ramp (Ramp (Ramp rhs-base (IntImm32 1) 4) 
+                        (Broadcast rhs-r-stride 4) 
+                        (/ r-lanes 4)
+                        )
+                  (Broadcast (IntImm32 4) r-lanes)
+                  y-lanes
             )
-        (AMX2Mem mat))))
-    (= out-lanes (* x-lanes y-lanes))
-    (= tot-lanes (* out-lanes r-lanes))
-
-    ; LHS
-    (= lhs-index
-        (Ramp (Broadcast (Ramp lhs-base lhs-r-stride r-lanes) y-lanes) 
-              (Broadcast x-stride (* y-lanes r-lanes))
-              x-lanes)
+            x-lanes
+        )
     )
-    (= lhs-r-stride (IntImm32 1))
+) (
+    (let amx-rhs (Load (UIntOrInt rhs-signed 8 (* r-lanes y-lanes)) rhs-name (Ramp rhs-base (IntImm32 1) (* r-lanes y-lanes))))
+    (amx-int/uint-rhs orig-rhs-mem x-lanes y-lanes r-lanes amx-rhs)
+))
 
-    ; RHS
+(relation amx-float-rhs (
+    Expr ;; orig-expr
+    i64 ;; x-lanes
+    i64 ;; y-lanes
+    i64 ;; r-lanes
+    Expr ;; rhs-expr
+))
+
+(rule (
+    (= orig-rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-index))
     (= rhs-index
         (Broadcast
             (Ramp (Ramp (Ramp rhs-base (IntImm32 1) 2) 
@@ -124,9 +120,84 @@
         )
     )
 ) (
-    (let new-lhs (Call "tile_load" (BFloat 16 512) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
-    (let new-rhs (Call "tile_load" (BFloat 16 512) (vec-of (IntImm16 (/ r-lanes 2)) (IntImm16 (* y-lanes 2)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
-    (let new-e (Call "tile_matmul" (Float 32 256) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) mat new-lhs new-rhs)))
+    (let amx-rhs (Call "tile_load" (BFloat 16 (* r-lanes y-lanes)) (vec-of (IntImm16 (/ r-lanes 2)) (IntImm16 (* y-lanes 2)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+    (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
+))
+
+(rule (
+    (= orig-rhs-mem (AMX2Mem orig-rhs))
+    (= orig-rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-index))
+    (= rhs-index
+        (Broadcast
+            (Ramp (Ramp (Ramp rhs-base (IntImm32 1) 2) 
+                        (Broadcast rhs-r-stride 2)
+                        (/ r-lanes 2)
+                        )
+                  (Broadcast (IntImm32 2) r-lanes)
+                  y-lanes
+            )
+            x-lanes
+        )
+    )
+) (
+    (let amx-rhs (Load (BFloat 16 (* r-lanes y-lanes)) rhs-name (Ramp rhs-base (IntImm32 1) (* r-lanes y-lanes))))
+    (amx-float-rhs orig-rhs-mem x-lanes y-lanes r-lanes amx-rhs)
+))
+
+; Int8/UInt8
+(rule (
+    (= e (Mem2AMX
+        (Bop (Add) 
+            (VectorReduce (Int 32 out-lanes) (Add) 
+                (Bop (Mul) 
+                    (Cast (Int 32 tot-lanes) (Load (UIntOrInt lhs-signed 8 tot-lanes) lhs-name lhs-index)) 
+                    (Cast (Int 32 tot-lanes) rhs))
+                )
+            (AMX2Mem mat))))
+    (= out-lanes (* x-lanes y-lanes))
+    (= tot-lanes (* out-lanes r-lanes))
+
+    ;; LHS
+    (= lhs-index
+        (Ramp (Broadcast (Ramp lhs-base lhs-r-stride r-lanes) y-lanes) 
+              (Broadcast x-stride (* y-lanes r-lanes))
+              x-lanes)
+    )
+    (= lhs-r-stride (IntImm32 1))
+
+    (amx-int/uint-rhs rhs x-lanes y-lanes r-lanes new-rhs)
+) (
+    (let new-lhs (Call "tile_load" (UIntOrInt lhs-signed 8 (* x-lanes r-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
+    (let new-e (Call "tile_matmul" (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) mat new-lhs new-rhs)))
+    (AMXShape e x-lanes (* y-lanes 4))
+    (union e new-e)
+))
+
+; Float16
+(rule (
+    (= e (Mem2AMX
+        (Bop (Add) 
+        (VectorReduce (Float 32 out-lanes) (Add) 
+            (Bop (Mul) 
+                (Cast (Float 32 tot-lanes) (Load (BFloat 16 tot-lanes) lhs-name lhs-index))
+                (Cast (Float 32 tot-lanes) rhs))
+            )
+        (AMX2Mem mat))))
+    (= out-lanes (* x-lanes y-lanes))
+    (= tot-lanes (* out-lanes r-lanes))
+
+    ; LHS
+    (= lhs-index
+        (Ramp (Broadcast (Ramp lhs-base lhs-r-stride r-lanes) y-lanes) 
+              (Broadcast x-stride (* y-lanes r-lanes))
+              x-lanes)
+    )
+    (= lhs-r-stride (IntImm32 1))
+
+    (amx-float-rhs rhs x-lanes y-lanes r-lanes new-rhs)
+) (
+    (let new-lhs (Call "tile_load" (BFloat 16 (* x-lanes r-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
+    (let new-e (Call "tile_matmul" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) mat new-lhs new-rhs)))
     (AMXShape e x-lanes (* y-lanes 4))
     (union e new-e)
 ))
@@ -143,7 +214,7 @@
         )))
     (AMXShape e rows colbytes)
 ) (
-    (let new-e (Call "tile_zero" (Int 32 256) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
+    (let new-e (Call "tile_zero" (Int 32 lanes) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
     (union e new-e)
 ))
 
@@ -155,7 +226,7 @@
         )))
     (AMXShape e rows colbytes)
 ) (
-    (let new-e (Call "tile_zero" (Float 32 256) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
+    (let new-e (Call "tile_zero" (Float 32 lanes) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
     (union e new-e)
 ))
 
@@ -175,9 +246,9 @@
     ; We need to know the shape of the computation 
     ; before loading it
     (AMXShape e row colbytes)
-    (has-type value (UIntOrInt _sign 8 _lanes))
+    (has-type value (UIntOrInt sign 8 lanes))
 ) (
-    (let new-e (Call "tile_load" (Int 8 1024)
+    (let new-e (Call "tile_load" (UIntOrInt sign 8 lanes)
                    (vec-of (IntImm16 row)
                            (IntImm16 colbytes)
                            (StoreAndLoad value)
@@ -191,9 +262,9 @@
     ; We need to know the shape of the computation 
     ; before loading it
     (AMXShape e row colbytes)
-    (has-type value (Float 32 _lanes))
+    (has-type value (BFloat 16 lanes))
 ) (
-    (let new-e (Call "tile_load" (Float 32 256)
+    (let new-e (Call "tile_load" (BFloat 16 lanes)
                    (vec-of (IntImm16 row)
                            (IntImm16 colbytes)
                            (StoreAndLoad value)
@@ -207,20 +278,20 @@
 (rule (
     (= e (Mem2AMX
         (Load ty name index)))
-    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) n-stride n-lanes))
+    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
     (= ty (UIntOrInt _sign 8 _lanes))
 ) (
-    (let new-e (Call "tile_load" (Int 8 1024) (vec-of (IntImm16 n-lanes) (IntImm16 m-lanes) (Var (Handle 1) name) base n-stride)))
+    (let new-e (Call "tile_load" ty (vec-of (IntImm16 n-lanes) (IntImm16 m-lanes) (Var (Handle 1) name) base n-stride)))
     (union e new-e)
 ))
 
 (rule (
     (= e (Mem2AMX
         (Load ty name index)))
-    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) n-stride n-lanes))
-    (= ty (Float 16 _lanes))
+    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
+    (= ty (BFloat 16 _lanes))
 ) (
-    (let new-e (Call "tile_load" (Int 16 512) (vec-of (IntImm16 n-lanes) (IntImm16 (* m-lanes 2)) (Var (Handle 1) name) base n-stride)))
+    (let new-e (Call "tile_load" ty (vec-of (IntImm16 n-lanes) (IntImm16 (* m-lanes 2)) (Var (Handle 1) name) base n-stride)))
     (union e new-e)
 ))
 
