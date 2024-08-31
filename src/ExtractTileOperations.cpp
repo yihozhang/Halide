@@ -1,9 +1,19 @@
 #include "ExtractTileOperations.h"
 
+#include "EqSatIRParser.h"
+#include "EqSatIRPrinter.h"
 #include "IRMatch.h"
 #include "IRMutator.h"
 #include "IROperator.h"
 #include "Util.h"
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <memory>
+#include <sstream>
+#include <sys/fcntl.h>
+#include <unistd.h>
+#include <unordered_set>
 
 /** \file Support extraction of AMX instructions. */
 
@@ -81,35 +91,7 @@ const auto wild_i32x = Variable::make(Int(32, 0), "*");
 
 Tile<1> get_1d_tile_index(const Expr &e) {
     if (const auto *r1 = e.as<Ramp>()) {
-
-        const auto stride_var = Variable::make(Int(32), "stride");
-        const auto v1 = Variable::make(Int(32), "v1");
-        const auto v2 = Variable::make(Int(32), "v2");
-        const auto v3 = Variable::make(Int(32), "v3");
-
-        Expr patterns[] = {
-            ((v1 * stride_var) + v2) * v3,
-            v3 * ((v1 * stride_var) + v2),
-            (v2 + (v1 * stride_var)) * v3,
-            v3 * (v2 + (v1 * stride_var)),
-        };
-
-        std::map<std::string, Expr> matches;
-        for (const auto &pattern : patterns) {
-            if (expr_match(pattern, r1->base, matches)) {
-                auto stride = std::move(matches["stride"]);
-                // stride must be a constant in order to not be confused with v1
-                if (stride.as<IntImm>()) {
-                    return {true, r1->base, {std::move(stride)}, {r1->lanes}};
-                }
-
-                // if stride wasn't a constant then v1 could possibly be the stride if constant
-                auto v1_expr = std::move(matches["v1"]);
-                if (v1_expr.as<IntImm>()) {
-                    return {true, r1->base, {std::move(v1_expr)}, {r1->lanes}};
-                }
-            }
-        }
+        return {true, r1->base, {r1->stride}, {r1->lanes}};
     }
 
     return {};
@@ -218,7 +200,7 @@ Tile<3> get_3d_tile_index(const Expr &e) {
  * The pattern which is getting matched looks roughly like
  * `broadcast(ramp(0, 1, r), x*y) / broadcast(4, x*y*r) + optional(broadcast(base, x*y*r)) * broadcast(8, x*y*r) +
  *  broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r) +
- *  broadcast(ramp(broadcast(_, r), broadcast(4, r), x) , y)`
+ *  broadcast(ramp(broadcast(_, r), broadcast(4, r), y) , x)`
  */
 Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     const auto *sub = e.as<Sub>();
@@ -239,38 +221,38 @@ Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     // The right hand side of the add expression is used for retrieving the dimensions of the matrix.
     // obtain the x, y, r dimensions
     // this expr looks like below, the shape of `add_lhs->a` can be seen further down below
-    // broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r) + broadcast(ramp(broadcast(base, r), broadcast(4, r), x) , y)
+    // broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r) + broadcast(ramp(broadcast(base, r), broadcast(4, r), y) , x)
     const Add *dim_expr = add_lhs->b.as<Add>();
 
     if (!dim_expr) {
         return {};
     }
 
-    // broadcast(ramp(broadcast(_, r), broadcast(4, r), x), y)
+    // broadcast(ramp(broadcast(_, r), broadcast(4, r), y), x)
     const Broadcast *base_stride_bc = dim_expr->b.as<Broadcast>();
 
     if (!base_stride_bc) {
         return {};
     }
 
-    int tile_y = base_stride_bc->lanes;
+    int tile_x = base_stride_bc->lanes;
 
     // broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r)
-    const Mod *mod = dim_expr->a.as<Mod>();
-
-    if (!mod) {
+    std::vector<Expr> results{};
+    const Expr mod_pattern = Mod::make(wild_i32x, Broadcast::make(4 / element_width, 0));
+    if (!expr_match(mod_pattern, dim_expr->a, results)) {
         return {};
     }
 
     // broadcast(ramp(0, 1, r), x*y)
-    const Broadcast *bc_ramp = mod->a.as<Broadcast>();
+    const Broadcast *bc_ramp = results[0].as<Broadcast>();
 
     if (!bc_ramp) {
         return {};
     }
 
     int tile_xy = bc_ramp->lanes;
-    int tile_x = tile_xy / tile_y;
+    int tile_y = tile_xy / tile_x;
 
     // ramp(0, 1, r)
     const Ramp *r_ramp = bc_ramp->value.as<Ramp>();
@@ -282,21 +264,13 @@ Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     int tile_r = r_ramp->lanes;
 
     // get the base and stride
-    // ramp(broadcast(_, r), broadcast(4, r), x)
-    const Ramp *base_stride_ramp = base_stride_bc->value.as<Ramp>();
-
-    if (!base_stride_ramp) {
+    // ramp(broadcast(_, r), broadcast(4, r), y)
+    const Expr base_stride_ramp_pattern = Ramp::make(Broadcast::make(wild_i32, tile_r), Broadcast::make(4 / element_width, tile_r), tile_y);
+    if (!expr_match(base_stride_ramp_pattern, base_stride_bc->value, results)) {
         return {};
     }
 
-    // broadcast(_, r)
-    const Broadcast *base_bc = base_stride_ramp->base.as<Broadcast>();
-
-    if (!base_bc) {
-        return {};
-    }
-
-    Expr base = base_bc->value;
+    Expr base = results[0];
     Expr stride;
 
     bool found_stride = false;
@@ -308,7 +282,6 @@ Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     // this stride pattern can occur if `tile_r` is the same size as `acc`
     auto stride_pattern = Broadcast::make(Ramp::make(0, 1, tile_r), tile_x * tile_y) / Broadcast::make((4 / element_width), tile_x * tile_y * tile_r) * Broadcast::make(wild_i32, tile_x * tile_y * tile_r);
 
-    std::vector<Expr> results{};
     if (expr_match(stride_pattern, add_lhs->a, results)) {
         found_stride = true;
         stride = std::move(results[0]);
@@ -353,17 +326,39 @@ BaseStride get_rhs_tile_index(const Expr &index, int element_width, int tile_x, 
 
             return {true, rhs_tile3.base, rhs_tile3.stride[0] * element_width};
         } else {
+            // 1D: degenerate as dot product. There are two cases:
+            //   * tile_r is 4, so effectively there is only one row in the loaded tile
+            //   * rhs.stride.1 == 4 && tile_y = 1, where the loaded RHS has shape (K/4)x4
+            //     and is contiguous in the memory
             if (rhs_tile1.extent[0] != tile_y * tile_r) {
                 return {};
             }
+            if (!(rhs_tile1.stride[0].as<IntImm>() && rhs_tile1.stride[0].as<IntImm>()->value == 1)) {
+                return {};
+            }
 
-            // times 4 because of the rhs layout, each vector used by AMX is 4 bytes in size.
-            // For the 4 gets divided by the element width which means each vector has 4 elements in u8/i8 and
-            // 2 elements for bf16.
-            return {true, rhs_tile1.base, rhs_tile1.stride[0] * (4 / element_width)};
+            if (tile_r == 4 / element_width) {
+                return {true, rhs_tile1.base, 0};
+            }
+
+            if (tile_y == 1) {
+                // 4 elements in u8/i8 and 2 elements for bf16.
+                return {true, rhs_tile1.base, 4 / element_width};
+            }
+
+            return {};
         }
     } else {
+        // The only case where there is a ramp of ramp is when tile_y = 1 and so RHS has size (K/4)x4
+        // (and rhs.stride.1 != 4, for o.w. it degenerates to 1D)
         if (tile_y != rhs_tile2.extent[0] || tile_r != rhs_tile2.extent[1]) {
+            return {};
+        }
+        if (!(rhs_tile2.stride[1].as<IntImm>() && rhs_tile2.stride[1].as<IntImm>()->value == 1)) {
+            return {};
+        }
+
+        if (tile_y != 1) {
             return {};
         }
 
@@ -599,8 +594,8 @@ class ExtractTileOperations : public IRMutator {
                 body = mutate(body);
             }
 
-            auto alloc_type = amx_op_type_result_type(op_type);
-            return Allocate::make(amx_name, alloc_type, MemoryType::AMXTile, {1}, const_true(), body);
+            auto tile_type = amx_op_type_result_type(op_type);
+            return Allocate::make(amx_name, tile_type, MemoryType::AMXTile, {1}, const_true(), body);
         }
         return IRMutator::visit(op);
     }
@@ -669,10 +664,345 @@ class ExtractTileOperations : public IRMutator {
     }
 };
 
+// The only case we need to insert an AMXToMem node is when we are loading to an AMX tile
+// The only case we need to insert a MemToAMX node is when we are storing to an AMX tile
+class AnnotateDataMovement : public IRMutator {
+    using IRMutator::visit;
+
+public:
+    AnnotateDataMovement() = default;
+
+protected:
+    std::vector<string> amx_vars;
+
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::AMXTile) {
+            user_assert(
+                (op->type.is_int_or_uint() && op->type.bits() == 32) ||
+                (op->type.is_float() && op->type.bits() == 32) ||
+                (op->type.is_int_or_uint() && op->type.bits() == 8) ||
+                (op->type.is_bfloat() && op->type.bits() == 16))
+                << "scheduled tile operations must yield 32-bit integers or 32-bit floats for output, 8-bit integers or 16-bit floats for input";
+
+            std::vector<string> curr_amx_vars(this->amx_vars);
+            curr_amx_vars.push_back(op->name);
+            ScopedValue<vector<string>> old_amx_vars(amx_vars, std::move(curr_amx_vars));
+
+            Stmt body = mutate(op->body);
+
+            return Allocate::make(op->name, op->type, MemoryType::AMXTile, op->extents, const_true(), body);
+        } else {
+            return IRMutator::visit(op);
+        }
+    }
+
+    Expr visit(const Load *load) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), load->name) != amx_vars.end()) {
+            internal_assert(is_const_one(load->predicate)) << "Only constant predicate is supported in AMX";
+            return AMXToMem::make(load, load->type);
+        } else {
+            return load;
+        }
+    }
+
+    Stmt visit(const Store *store) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), store->name) != amx_vars.end()) {
+            // `Load` can only occur in store->value,
+            Expr value = MemToAMX::make(mutate(store->value), store->value.type());
+            internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
+            return Store::make(
+                store->name,
+                value,
+                store->index,
+                store->param,
+                store->predicate,
+                store->alignment);
+        } else {
+            return IRMutator::visit(store);
+        }
+    }
+};
+
+std::string PLACEHOLDER_PREFIX = "collect_stores_placeholder_";
+
+struct CollectStores : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+    std::map<std::string, Stmt> stores;
+
+    Stmt visit(const Store *op) override {
+        auto no = stores.size();
+        auto placeholder = PLACEHOLDER_PREFIX + std::to_string(no);
+        stores[placeholder] = op;
+        return Store::make(placeholder, op->value, op->index, op->param, op->predicate, op->alignment);
+    }
+};
+
+struct SubstStores : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+    const std::map<std::string, Stmt> &stores;
+
+    SubstStores(std::map<std::string, Stmt> &&stores)
+        : stores(stores) {
+    }
+
+    Stmt visit(const Store *op) override {
+        internal_assert(op->name.find(PLACEHOLDER_PREFIX) == 0)
+            << "All stores should have been replaced with a place holder";
+        auto it = stores.find(op->name);
+        internal_assert(it != stores.end()) << "Store not found";
+        return it->second;
+    }
+};
+
+Type convert_to_tile_type(Type type) {
+    Type tile_type;
+    if (type.is_bfloat() && type.bits() == 16) {
+        tile_type = BFloat(16, 512);
+    } else if (type.is_int() || type.is_uint() || type.is_float()) { // is_float() returns true for bfloat
+        tile_type = type.with_lanes(1024 / type.bytes());
+    } else {
+        internal_error << "Unsupported type for AMX tile";
+    }
+    return tile_type;
+}
+
+// The expression returned by EqSat, is not necessarily compatiable with the
+// runtime, since the runtime always views an AMX Tile as a 256-lane vector.
+class EnforceAMXShape : public IRMutator {
+    using IRMutator::visit;
+
+protected:
+    std::vector<string> amx_vars;
+    std::unordered_map<string, int> amx_tile_size;
+
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::AMXTile) {
+            std::vector<string> curr_amx_vars(this->amx_vars);
+            curr_amx_vars.push_back(op->name);
+            ScopedValue<vector<string>> old_amx_vars(amx_vars, std::move(curr_amx_vars));
+            auto body = mutate(op->body);
+            internal_assert(amx_tile_size.count(op->name)) << "AMX tile size not found";
+
+            auto tile_type = convert_to_tile_type(op->type);
+            return Allocate::make(op->name, tile_type, MemoryType::AMXTile, {amx_tile_size[op->name]}, const_true(), body);
+        } else {
+            return IRMutator::visit(op);
+        }
+    }
+
+    int get_nth_tile_from_tile_index(const Expr &e) {
+        const Ramp *ramp = e.as<Ramp>();
+        if (!ramp) {
+            internal_error << "AMX tile can only be indexed with ramp";
+            return -1;
+        }
+        int vec_length = ramp->lanes;
+        const int64_t *basep = as_const_int(ramp->base);
+        if (!basep) {
+            internal_error << "Only constant base is supported in AMX";
+            return -1;
+        }
+        int base = (int)*basep;
+        internal_assert(base % vec_length == 0) << "Cannot determine which AMX tile to load from";
+        return base / vec_length;
+    }
+
+    Expr visit(const Load *load) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), load->name) != amx_vars.end()) {
+            int tile = get_nth_tile_from_tile_index(load->index);
+            amx_tile_size[load->name] = std::max(amx_tile_size[load->name], tile + 1);
+            Type tile_type = convert_to_tile_type(load->type);
+            int tile_lanes = tile_type.lanes();
+            return Load::make(tile_type,
+                              load->name,
+                              Ramp::make(tile_lanes * tile, 1, tile_lanes),
+                              load->image,
+                              load->param,
+                              const_true(tile_lanes),
+                              load->alignment);
+        } else {
+            return load;
+        }
+    }
+
+    Stmt visit(const Store *store) override {
+        if (std::find(amx_vars.begin(), amx_vars.end(), store->name) != amx_vars.end()) {
+            internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
+            int tile = get_nth_tile_from_tile_index(store->index);
+            amx_tile_size[store->name] = std::max(amx_tile_size[store->name], tile + 1);
+            int tile_lanes = convert_to_tile_type(store->value.type()).lanes();
+
+            // There should not be a Load in places other than value,
+            // so we don't need to mutate them.
+            Expr value = mutate(store->value);
+            return Store::make(
+                store->name,
+                value,
+                Ramp::make(tile * tile_lanes, 1, tile_lanes),
+                store->param,
+                const_true(tile_lanes),
+                store->alignment);
+        } else {
+            return IRMutator::visit(store);
+        }
+    }
+
+    Expr visit(const Call *call) override {
+        // Not included:
+        // - tile_store since it returns a single value
+        vector<string> intrinsic_names = {"tile_load", "tile_matmul", "tile_zero"};
+
+        if (std::find(intrinsic_names.begin(), intrinsic_names.end(), call->name) != intrinsic_names.end()) {
+            return Call::make(
+                convert_to_tile_type(call->type),
+                call->name,
+                mutate(call->args),
+                call->call_type,
+                call->func,
+                call->value_index,
+                call->image,
+                call->param);
+        } else {
+            return IRMutator::visit(call);
+        }
+    }
+};
+
 }  // namespace
 
 Stmt extract_tile_operations(const Stmt &s) {
     return ExtractTileOperations().mutate(s);
 }
+
+Stmt eqsat_extract_tile_operations(const Stmt &s) {
+    auto annotated_s = AnnotateDataMovement().mutate(s);
+    CollectStores collect_stores;
+    auto placeholder = collect_stores.mutate(annotated_s);
+    auto stores = std::move(collect_stores.stores);
+
+    std::vector<std::pair<std::string, std::string>> bindings;
+
+    for (const auto &[name, op] : stores) {
+        std::ostringstream oss;
+        EqSatIRPrinter sprinter(oss);
+        sprinter.print(op);
+        bindings.emplace_back(name, oss.str());
+    }
+
+    auto output = run_egglog(std::move(bindings));
+    auto optimized_programs = split_string(output, "\n");
+    bool amx_synthesized = false;
+    std::map<std::string, Stmt> new_stores;
+    for (int i = 0; i < optimized_programs.size(); i++) {
+        if (optimized_programs[i].empty()) {
+            continue;
+        }
+        auto &optimized = optimized_programs[i];
+        auto &name = bindings[i].first;
+        amx_synthesized = amx_synthesized || optimized.find("tile_matmul") != -1;
+
+        EqSatIRParser parser(optimized);
+        auto opvalue = parser.parse_stmt();
+
+        new_stores[name] = opvalue;
+    }
+    if (!amx_synthesized) {
+        std::cerr << "amx NOT synthesied\n";
+    } else {
+        std::cerr << "amx synthesized\n";
+    }
+    auto result = SubstStores(std::move(new_stores)).mutate(placeholder);
+    result = EnforceAMXShape().mutate(result);
+    return result;
+}
+
+std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&binding) {
+#include "egglog/main.tmpl.h"
+
+    std::string egglog_prog = EGGLOG_PROG(std::move(binding));
+
+    std::string filename = "/tmp/egglog_prog_" + std::to_string(getpid()) + ".egg";
+    // Write the program to a file
+    std::cout << "Writing egglog program to " << filename << std::endl;
+    std::ofstream file(filename);
+    file << egglog_prog;
+
+    int pipe_stdin[2];
+    int pipe_stdout[2];
+
+    if (pipe(pipe_stdin) < 0 || pipe(pipe_stdout) < 0) {
+        internal_error << "Failed to create pipe for egglog";
+        return "";
+    }
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        internal_error << "Failed to exec egglog";
+    }
+
+    if (pid == 0) {
+        const char *argv[] = {"egglog", nullptr};
+        close(pipe_stdin[1]);
+        close(pipe_stdout[0]);
+
+        // Redirect stdin and stdout
+        dup2(pipe_stdin[0], STDIN_FILENO);
+        dup2(pipe_stdout[1], STDOUT_FILENO);
+        int devnull = open("/dev/null", O_WRONLY | O_CREAT, 0666);
+        dup2(devnull, STDERR_FILENO);
+        close(pipe_stdin[0]);
+        close(pipe_stdout[1]);
+        execvp(argv[0], const_cast<char **>(argv));
+        internal_error << "egglog failed to exec";
+        return "";
+    }
+
+    close(pipe_stdout[1]);
+
+    // Write to the subprocess's stdin
+    write(pipe_stdin[1], egglog_prog.c_str(), egglog_prog.size());
+    close(pipe_stdin[1]);
+
+    // Read from the subprocess's stdout
+    std::ostringstream oss;
+    char buffer[128];
+    ssize_t count;
+    while ((count = read(pipe_stdout[0], buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[count] = '\0';  // Null-terminate the string
+        oss << buffer;
+    }
+
+    close(pipe_stdout[0]);
+    return oss.str();
+}
+
+template<>
+void ExprNode<MemToAMX>::accept(IRVisitor *v) const {
+    EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
+    internal_assert(ev) << "MemToAMX can only be visited by EqSatIRVisitor\n";
+    ev->visit((const MemToAMX *)this);
+}
+template<>
+void ExprNode<AMXToMem>::accept(IRVisitor *v) const {
+    EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
+    internal_assert(ev) << "AMXToMem can only be visited by EqSatIRVisitor\n";
+    ev->visit((const AMXToMem *)this);
+}
+
+template<>
+Expr ExprNode<MemToAMX>::mutate_expr(IRMutator *v) const {
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "MemToAMX can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const MemToAMX *)this);
+}
+
+template<>
+Expr ExprNode<AMXToMem>::mutate_expr(IRMutator *v) const {
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "AMXToMem can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const AMXToMem *)this);
+}
+
 }  // namespace Internal
 }  // namespace Halide

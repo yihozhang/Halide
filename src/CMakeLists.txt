@@ -97,6 +97,8 @@ target_sources(
     Elf.h
     EliminateBoolVectors.h
     EmulateFloat16Math.h
+    EqSatIRParser.h
+    EqSatIRPrinter.h
     Error.h
     Expr.h
     ExprUsesVar.h
@@ -276,6 +278,8 @@ target_sources(
     Elf.cpp
     EliminateBoolVectors.cpp
     EmulateFloat16Math.cpp
+    EqSatIRParser.cpp
+    EqSatIRPrinter.cpp
     Error.cpp
     Expr.cpp
     ExtractTileOperations.cpp

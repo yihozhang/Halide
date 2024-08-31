@@ -367,7 +367,7 @@ Stmt Simplify::visit(const Allocate *op) {
     std::vector<Expr> new_extents;
     bool all_extents_unmodified = true;
     ExprInfo total_extent_info;
-    total_extent_info.bounds = ConstantInterval::single_point(op->type.bytes());
+    total_extent_info.bounds = ConstantInterval::single_point(op->type.bytes() * op->type.lanes());
     for (size_t i = 0; i < op->extents.size(); i++) {
         ExprInfo extent_info;
         new_extents.push_back(mutate(op->extents[i], &extent_info));
