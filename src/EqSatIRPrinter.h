@@ -12,7 +12,7 @@
 namespace Halide {
 namespace Internal {
 
-class EqSatIRPrinter : public EqSatIRVisitor {
+class EqSatIRPrinter : public EqSatExtensions::EqSatIRVisitor {
 public:
     /** Construct an IRPrinter pointed at a given output stream
      * (e.g. std::cout, or a std::ofstream) */
@@ -56,8 +56,17 @@ protected:
     void visit(const Call *) override;
     void visit(const Let *) override;
     void visit(const VectorReduce *) override;
-    void visit(const MemToAMX *) override;
-    void visit(const AMXToMem *) override;
+    void visit(const EqSatExtensions::MemToAMX *) override;
+    void visit(const EqSatExtensions::AMXToMem *) override;
+    void visit(const EqSatExtensions::GLoad *) override {
+        internal_error << "GLoad not supported\n";
+    }
+    void visit(const EqSatExtensions::GVariable *) override {
+        internal_error << "GVariable not supported\n";
+    }
+    void visit(const EqSatExtensions::Computed *) override {
+            internal_error << "Computed not supported\n";
+    }
     void visit(const Store *) override;
 };
 

@@ -4,6 +4,11 @@
 ;; Datatype declarations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(datatype Loc 
+    (Mem) ; This is where the generic computation happens
+    (AMX) ; AMX tiles
+)
+
 (datatype BinOp
     (Add)
     (Sub)
@@ -40,6 +45,9 @@
 (sort Expr)
 (sort VecExpr (Vec Expr))
 
+(sort Variable)
+(function V (String) Variable)
+
 ;; Expr
 (function Cast (Type Expr) Expr)
 (function Reinterpret (Type Expr) Expr)
@@ -48,7 +56,7 @@
 ;; condition true_val false_val
 (function Select (Expr Expr Expr) Expr)
 ;; name index
-(function Load (Type String Expr) Expr)
+(function Load (Type Variable Expr) Expr)
 ;; base stride lanes
 (function Ramp (Expr Expr i64) Expr :cost 100)
 ;; value lanes
@@ -60,7 +68,7 @@
 (function Call (String Type VecExpr) Expr)
 ;; name
 ;; TODO: there are some arguments that are ignored here
-(function Var (Type String) Expr)
+(function Var (Type Variable) Expr)
 (function Shuffle (VecExpr VecInt) Expr)
 (function VectorReduce (Type BinOp Expr) Expr)
 ;;                bits val
@@ -96,13 +104,40 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extensions to the IR
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(function Loc2Loc (Loc Loc Expr) Expr :unextractable)
 (function Mem2AMX (Expr) Expr :unextractable)
 (function AMX2Mem (Expr) Expr :unextractable)
-;; Takes a non-AMX expression, stores it in memory, and then loads it back
-(function StoreAndLoad (Expr) Expr)
-;; takes an AMX expression, tile_store it in memory, 
-;; and then load this memory back
-(function AMXStoreAndLoad (Expr) Expr)
+(birewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))
+(birewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))
+
+(function ExprVar (Loc Expr) Variable)
+
+(function KWayInterleave (
+    i64 ;; k
+    Expr ;; base
+    i64 ;; height
+    i64 ;; width
+    Expr ;; stride
+) Expr)
+
+;; We don't need StoreAndLoad... Use ExprVar instead
+; ;; takes an expression over loc1, stores it in loc1, 
+; ;; and then loads it back in loc2
+; ;; There is actually no load happening here:
+; ;;       *StoreAndLoad returns the base address and by itself
+; ;;       it does not load the value
+; ;;       It may be better named as StoreAndReturnBaseAddress (This name is suggested by Copilot)
+; ;;       Or Spill
+; (function GenericStoreAndLoad (Loc Loc Expr) Expr)
+; ;; Takes a Mem expression, stores it in memory, and then loads it back
+; (function StoreAndLoad (Expr) Expr)
+; ;; takes an AMX expression, tile_store it in memory, 
+; ;; and then load this memory back
+; (function AMXStoreAndLoad (Expr) Expr)
+; (birewrite (AMXStoreAndLoad e) (GenericStoreAndLoad (AMX) (Mem) e))
+; (birewrite (StoreAndLoad e) (GenericStoreAndLoad (Mem) (Mem) e))
+
+
 ;; This is for use with StoreAndLoad
 (function Computed () Expr)
 

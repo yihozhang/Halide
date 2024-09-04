@@ -109,7 +109,7 @@ void EqSatIRPrinter::visit(const Reinterpret *e) {
 }
 
 void EqSatIRPrinter::visit(const Variable *e) {
-    printArgs(stream, "Var", TYPE_ARG(e->type), NAME_ARG(e->name));
+    printArgs(stream, "Var", TYPE_ARG(e->type), "(V", NAME_ARG(e->name), ")");
 }
 
 GENERATE_VISIT_BINOP(Add)
@@ -137,7 +137,7 @@ void EqSatIRPrinter::visit(const Select *e) {
 }
 
 void EqSatIRPrinter::visit(const Load *e) {
-    printArgs(stream, "Load", TYPE_ARG(e->type), NAME_ARG(e->name), EXPR_ARG(e->index));
+    printArgs(stream, "Load", TYPE_ARG(e->type), "(V", NAME_ARG(e->name), ")", EXPR_ARG(e->index));
 }
 
 void EqSatIRPrinter::visit(const Ramp *e) {
@@ -170,11 +170,11 @@ void EqSatIRPrinter::visit(const VectorReduce *e) {
     printArgs(stream, "VectorReduce", TYPE_ARG(e->type), "(Add)", EXPR_ARG(e->value));
 }
 
-void EqSatIRPrinter::visit(const MemToAMX *e) {
+void EqSatIRPrinter::visit(const EqSatExtensions::MemToAMX *e) {
     printArgs(stream, "Mem2AMX", EXPR_ARG(e->expr));
 }
 
-void EqSatIRPrinter::visit(const AMXToMem *e) {
+void EqSatIRPrinter::visit(const EqSatExtensions::AMXToMem *e) {
     printArgs(stream, "AMX2Mem", EXPR_ARG(e->expr));
 }
 

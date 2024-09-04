@@ -13,6 +13,7 @@
 namespace Halide {
 namespace Internal {
 
+namespace EqSatExtensions {
 struct MemToAMX : public ExprNode<MemToAMX> {
     Expr expr;
     static Expr make(Expr expr, Type type) {
@@ -29,12 +30,67 @@ struct AMXToMem : public ExprNode<AMXToMem> {
     Expr expr;
     static Expr make(Expr expr, Type type) {
         AMXToMem *node = new AMXToMem;
-        node->expr = expr;
+        node->expr = std::move(expr);
         node->type = type;
         return node;
     }
     // This should not matter because MemToAMX is inserted only for the EqSat phase.
     static const IRNodeType _node_type = IRNodeType::Call;
+};
+
+// Computed is a placeholder for computed extent of ExprVars
+struct Computed : public ExprNode<Computed> {
+    static Expr make(Type type) {
+        Computed *node = new Computed;
+        node->type = Int(64);
+        return node;
+    }
+    static const IRNodeType _node_type = IRNodeType::Call;
+};
+
+struct Var {
+    virtual ~Var() = default;
+};
+
+struct StringVar : public Var {
+    std::string name;
+    StringVar(const std::string &name)
+        : name(name) {
+    }
+};
+
+struct ExprVar : public Var {
+    Expr expr;
+    ExprVar(Expr expr)
+        : expr(std::move(expr)) {
+    }
+};
+
+// Generalized load where the buffer can be either a var (string)
+// or an expression.
+struct GLoad : public ExprNode<GLoad> {
+
+    std::shared_ptr<Var> name;
+
+    Expr predicate, index;
+
+    Buffer<> image;
+    Parameter param;
+    ModulusRemainder alignment;
+
+    static Expr make(Type type, std::shared_ptr<Var> name,
+                     Expr index, Buffer<> image,
+                     Parameter param,
+                     Expr predicate,
+                     ModulusRemainder alignment);
+
+    static const IRNodeType _node_type = IRNodeType::Load;
+};
+
+struct GVariable : public ExprNode<GVariable> {
+    std::shared_ptr<Var> name;
+    static Expr make(Type type, std::shared_ptr<Var> name);
+    static const IRNodeType _node_type = IRNodeType::Variable;
 };
 
 class EqSatIRVisitor : public IRVisitor {
@@ -45,6 +101,14 @@ public:
     }
     virtual void visit(const AMXToMem *e) {
         e->expr.accept(this);
+    }
+    virtual void visit(const GLoad *e) {
+        e->predicate.accept(this);
+        e->index.accept(this);
+    }
+    virtual void visit(const GVariable *e) {
+    }
+    virtual void visit(const Computed *e) {
     }
 };
 
@@ -68,7 +132,39 @@ public:
             return AMXToMem::make(value, e->type);
         }
     }
+
+    virtual std::shared_ptr<Var> visit(std::shared_ptr<Var> var) {
+        if (auto v = std::dynamic_pointer_cast<StringVar>(var)) {
+            return var;
+        } else if (auto v = std::dynamic_pointer_cast<ExprVar>(var)) {
+            Expr expr = mutate(v->expr);
+            if (expr.same_as(v->expr)) {
+                return var;
+            } else {
+                return std::make_shared<ExprVar>(expr);
+            }
+        }
+        internal_error << "Unknown Var type\n";
+        return {};
+    }
+
+    virtual Expr visit(const GLoad *e) {
+        Expr predicate = mutate(e->predicate);
+        Expr index = mutate(e->index);
+        return GLoad::make(e->type, visit(e->name), index, e->image, e->param, predicate, e->alignment);
+    }
+
+    virtual Expr visit(const GVariable *e) {
+        return GVariable::make(e->type, visit(e->name));
+    }
+
+    virtual Expr visit(const Computed *e) {
+        return e;
+    }
+
 };
+
+}  // namespace EqSatExtensions
 
 /** Rewrite any AMX tile operations that have been stored in the AMXTile memory
  * type as intrinsic calls, to be used in the X86 backend. */

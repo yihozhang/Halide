@@ -25,7 +25,7 @@
 
 (rule (
     (AMXAllocation name rows colbytes)
-    (= e (Var t name))
+    (= e (Var t (V name)))
 ) (
     (AMXShape e rows colbytes)
 ))
@@ -121,6 +121,25 @@
     )
 ) (
     (let amx-rhs (Call "tile_load" (BFloat 16 (* r-lanes y-lanes)) (vec-of (IntImm16 (/ r-lanes 2)) (IntImm16 (* y-lanes 2)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+    (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
+))
+
+(rule (
+    (= orig-rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-index))
+    (= rhs-index
+        (Broadcast
+            (Ramp (Ramp rhs-base 
+                        rhs-r-stride
+                        r-lanes
+                        )
+                  (Broadcast (IntImm32 1) r-lanes)
+                  y-lanes
+            )
+            x-lanes
+        )
+    )
+) (
+    (let amx-rhs (Var (Handle 1) (ExprVar (Mem) (KWayInterleave 4 rhs-base r-lanes y-lanes rhs-r-stride))))
     (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
 ))
 
@@ -235,7 +254,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; there are two ways to translate an Mem2AMX:
-;; We can use AMXStoreAndLoad followed by an tileload,
+;; We can use computes the entire computation in memory (`(ExprVar (Mem) ...)`),
+;; followed by an tileload,
 ;; Or if the argument to Mem2AMX is a load of a specific pattern,
 ;; then we can just to a tileload
 
@@ -251,7 +271,7 @@
     (let new-e (Call "tile_load" (UIntOrInt sign 8 lanes)
                    (vec-of (IntImm16 row)
                            (IntImm16 colbytes)
-                           (StoreAndLoad value)
+                           (Var (Handle 1) (ExprVar (Mem) value))
                            (Computed)
                            (Computed))))
     (union e new-e)
@@ -267,7 +287,7 @@
     (let new-e (Call "tile_load" (BFloat 16 lanes)
                    (vec-of (IntImm16 row)
                            (IntImm16 colbytes)
-                           (StoreAndLoad value)
+                           (Var (Handle 1) (ExprVar (Mem) value))
                            (Computed)
                            (Computed))))
     (union e new-e)
@@ -300,12 +320,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; there are two ways to translate an AMX2Mem:
-;; We can use AMXStoreAndLoad, which stores the
-;; AMX result in some contiguous memory and then load it,
+;; We can compute the expression as is, and stores the
+;; AMX result in some temporary buffer contiguously,
 ;; Or if the statement has the form (Store name (AMX2Mem value) index),
 ;; and the index has a specific pattern, then we can directly tile_store it.
 
-(rewrite (AMX2Mem value) (AMXStoreAndLoad value))
+(rewrite (AMX2Mem value) (Load ty (ExprVar (AMX) value) (Computed))
+    :when ((has-type value ty)))
 
 (rule (
     (= s (Store store-name (AMX2Mem tile) index))
@@ -317,7 +338,7 @@
         (Call "tile_store" (Int 32 1) 
             (vec-of (IntImm16 n-lanes) 
                     (IntImm16 (* m-lanes bytes))
-                    (Var (Handle 1) store-name)
+                    (Var (Handle 1) (V store-name))
                     (Bop (Mul) base (IntImm32 bytes))
                     (Bop (Mul) n-stride (IntImm32 bytes))
                     tile

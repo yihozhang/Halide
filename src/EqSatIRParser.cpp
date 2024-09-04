@@ -1,4 +1,6 @@
 #include "EqSatIRParser.h"
+
+#include <memory>
 #include "IR.h"
 #include "IROperator.h"
 
@@ -14,6 +16,7 @@ namespace Halide {
 
 namespace Internal {
 
+namespace EqSatExtensions {
 Expr EqSatIRParser::parse_expr() {
     expect('(');
 
@@ -41,9 +44,9 @@ Expr EqSatIRParser::parse_expr() {
         result = Select::make(pred, true_val, false_val);
     } else if (is_head("Load")) {
         auto type = parse_type();
-        auto name = parse_str();
+        auto name = parse_var();
         auto index = parse_expr();
-        result = Load::make(type, name, index, Buffer<>(), Parameter(), const_true(type.lanes()), ModulusRemainder());
+        result = GLoad::make(type, name, index, Buffer<>(), Parameter(), const_true(type.lanes()), ModulusRemainder());
     } else if (is_head("Ramp")) {
         auto base = parse_expr();
         auto stride = parse_expr();
@@ -65,8 +68,8 @@ Expr EqSatIRParser::parse_expr() {
         result = Call::make(type, name, args, Call::Intrinsic);
     } else if (is_head("Var")) {
         auto type = parse_type();
-        auto name = parse_str();
-        result = Variable::make(type, name);
+        auto name = parse_var();
+        result = GVariable::make(type, name);
     } else if (is_head("VectorReduce")) {
         auto type = parse_type();
         // TODO: only does add now
@@ -127,6 +130,22 @@ Expr EqSatIRParser::parse_uop() {
     }
     internal_error << "Unknown unary operator at " << std::to_string(curr);
     return Expr();
+}
+
+std::shared_ptr<Var> EqSatIRParser::parse_var() {
+    expect('(');
+    std::shared_ptr<Var> result;
+    if (is_head("V")) {
+        std::string name = parse_str();
+        result = std::make_shared<StringVar>(name);
+    } else if (is_head("ExprVar")) {
+        auto expr = parse_expr();
+        result = std::make_shared<ExprVar>(expr);
+    } else {
+        internal_error << "Unknown variable at " << std::to_string(curr);
+    }
+    expect(')');
+    return result;
 }
 
 Type EqSatIRParser::parse_type() {
@@ -210,6 +229,8 @@ Stmt EqSatIRParser::parse_stmt() {
     expect(')');
     return result;
 }
+
+}  // namespace EqSatExtensions
 
 }  // namespace Internal
 

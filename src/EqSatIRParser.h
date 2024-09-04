@@ -5,10 +5,13 @@
 #include <vector>
 #include "Type.h"
 #include "Expr.h"
+#include "ExtractTileOperations.h"
 
 namespace Halide {
 
 namespace Internal {
+
+namespace EqSatExtensions {
 
 struct EqSatIRParser {
 public:
@@ -17,6 +20,7 @@ public:
     Expr parse_expr();
     Expr parse_bop();
     Expr parse_uop();
+    std::shared_ptr<Var> parse_var();
     Type parse_type();
     std::string parse_str();
     int parse_int();
@@ -58,6 +62,8 @@ private:
         }
     }
 };
+
+} // namespace EqSatExtensions
 
 }  // namespace Internal
 

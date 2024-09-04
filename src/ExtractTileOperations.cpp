@@ -14,6 +14,7 @@
 #include <sys/fcntl.h>
 #include <unistd.h>
 #include <unordered_set>
+#include <utility>
 
 /** \file Support extraction of AMX instructions. */
 
@@ -42,12 +43,10 @@
 
 namespace Halide {
 namespace Internal {
-
 using std::string;
 using std::vector;
 
 namespace {
-
 template<int Dim>
 struct Tile {
     bool result;
@@ -664,6 +663,34 @@ class ExtractTileOperations : public IRMutator {
     }
 };
 
+}  // namespace
+
+namespace EqSatExtensions {
+
+Expr GLoad::make(Type type, std::shared_ptr<Var> name, Expr index, Buffer<> image, Parameter param, Expr predicate, ModulusRemainder alignment) {
+    internal_assert(predicate.defined()) << "Load with undefined predicate\n";
+    internal_assert(index.defined()) << "Load of undefined\n";
+    internal_assert(type.lanes() == index.type().lanes()) << "Vector lanes of Load must match vector lanes of index\n";
+    internal_assert(type.lanes() == predicate.type().lanes())
+        << "Vector lanes of Load must match vector lanes of predicate\n";
+
+    GLoad *node = new GLoad();
+    node->type = type;
+    node->name = std::move(name);
+    node->predicate = std::move(predicate);
+    node->index = std::move(index);
+    node->image = std::move(image);
+    node->param = std::move(param);
+    node->alignment = alignment;
+    return node;
+}
+
+Expr GVariable::make(Type type, std::shared_ptr<Var> name) {
+    GVariable *node = new GVariable;
+    node->type = type;
+    node->name = std::move(name);
+    return node;
+}
 // The only case we need to insert an AMXToMem node is when we are loading to an AMX tile
 // The only case we need to insert a MemToAMX node is when we are storing to an AMX tile
 class AnnotateDataMovement : public IRMutator {
@@ -758,7 +785,7 @@ Type convert_to_tile_type(Type type) {
     Type tile_type;
     if (type.is_bfloat() && type.bits() == 16) {
         tile_type = BFloat(16, 512);
-    } else if (type.is_int() || type.is_uint() || type.is_float()) { // is_float() returns true for bfloat
+    } else if (type.is_int() || type.is_uint() || type.is_float()) {  // is_float() returns true for bfloat
         tile_type = type.with_lanes(1024 / type.bytes());
     } else {
         internal_error << "Unsupported type for AMX tile";
@@ -868,16 +895,38 @@ protected:
     }
 };
 
-}  // namespace
+class RemoveGLoadsAndGVars : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+protected:
+    Expr visit(const GLoad *load) override {
+        const StringVar* name = dynamic_cast<const StringVar *>(load->name.get());
+        if (name == nullptr) {
+            internal_error << "GLoad name must be a StringVar\n";
+            return {};
+        }
+        return Load::make(load->type, name->name, EqSatIRMutator::mutate(load->index), load->image, load->param, EqSatIRMutator::mutate(load->predicate), load->alignment);
+    }
+
+    Expr visit(const GVariable *var) override {
+        const StringVar* name = dynamic_cast<const StringVar *>(var->name.get());
+        if (name == nullptr) {
+            internal_error << "GVariable name must be a StringVar\n";
+            return {};
+        }
+        return Variable::make(var->type, name->name);
+    }
+};
+
+}  // namespace EqSatExtensions
 
 Stmt extract_tile_operations(const Stmt &s) {
     return ExtractTileOperations().mutate(s);
 }
 
 Stmt eqsat_extract_tile_operations(const Stmt &s) {
-    auto annotated_s = AnnotateDataMovement().mutate(s);
-    CollectStores collect_stores;
-    auto placeholder = collect_stores.mutate(annotated_s);
+    auto annotated_s = EqSatExtensions::AnnotateDataMovement().mutate(s);
+    EqSatExtensions::CollectStores collect_stores;
+    auto result = collect_stores.mutate(annotated_s);
     auto stores = std::move(collect_stores.stores);
 
     std::vector<std::pair<std::string, std::string>> bindings;
@@ -901,18 +950,18 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
         auto &name = bindings[i].first;
         amx_synthesized = amx_synthesized || optimized.find("tile_matmul") != -1;
 
-        EqSatIRParser parser(optimized);
+        EqSatExtensions::EqSatIRParser parser(optimized);
         auto opvalue = parser.parse_stmt();
 
-        new_stores[name] = opvalue;
+        new_stores[name] = EqSatExtensions::RemoveGLoadsAndGVars().mutate(opvalue);
     }
     if (!amx_synthesized) {
         std::cerr << "amx NOT synthesied\n";
     } else {
         std::cerr << "amx synthesized\n";
     }
-    auto result = SubstStores(std::move(new_stores)).mutate(placeholder);
-    result = EnforceAMXShape().mutate(result);
+    result = EqSatExtensions::SubstStores(std::move(new_stores)).mutate(result);
+    result = EqSatExtensions::EnforceAMXShape().mutate(result);
     return result;
 }
 
@@ -978,30 +1027,80 @@ std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&bindin
 }
 
 template<>
-void ExprNode<MemToAMX>::accept(IRVisitor *v) const {
+void ExprNode<EqSatExtensions::MemToAMX>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
     EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
     internal_assert(ev) << "MemToAMX can only be visited by EqSatIRVisitor\n";
     ev->visit((const MemToAMX *)this);
 }
 template<>
-void ExprNode<AMXToMem>::accept(IRVisitor *v) const {
+void ExprNode<EqSatExtensions::AMXToMem>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
     EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
     internal_assert(ev) << "AMXToMem can only be visited by EqSatIRVisitor\n";
     ev->visit((const AMXToMem *)this);
 }
+template<>
+void ExprNode<EqSatExtensions::GLoad>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "GLoad can only be mutated by EqSatIRMutator\n";
+    ev->visit((const GLoad *)this);
+}
+template<>
+void ExprNode<EqSatExtensions::Computed>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "Computed can only be mutated by EqSatIRMutator\n";
+    ev->visit((const Computed *)this);
+}
 
 template<>
-Expr ExprNode<MemToAMX>::mutate_expr(IRMutator *v) const {
+void ExprNode<EqSatExtensions::GVariable>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "GVariable can only be mutated by EqSatIRMutator\n";
+    ev->visit((const GVariable *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::MemToAMX>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
     EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
     internal_assert(ev) << "MemToAMX can only be mutated by EqSatIRMutator\n";
     return ev->visit((const MemToAMX *)this);
 }
 
 template<>
-Expr ExprNode<AMXToMem>::mutate_expr(IRMutator *v) const {
+Expr ExprNode<EqSatExtensions::AMXToMem>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
     EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
     internal_assert(ev) << "AMXToMem can only be mutated by EqSatIRMutator\n";
     return ev->visit((const AMXToMem *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::GLoad>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "GLoad can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const GLoad *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::GVariable>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "GVariable can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const GVariable *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::Computed>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
+    internal_assert(ev) << "Computed can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const Computed *)this);
 }
 
 }  // namespace Internal
