@@ -139,7 +139,13 @@
         )
     )
 ) (
-    (let amx-rhs (Var (Handle 1) (ExprVar (Mem) (KWayInterleave 4 rhs-base r-lanes y-lanes rhs-r-stride))))
+    (let amx-rhs (Var (Handle 1) (ExprVar (Mem) 
+        (Call "KWayInterleave" (BFloat 16 (* y-lanes r-lanes)) 
+            (vec-of (IntImm32 4) 
+                    rhs-base 
+                    (IntImm32 r-lanes) 
+                    (IntImm32 y-lanes) 
+                    rhs-r-stride)))))
     (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
 ))
 

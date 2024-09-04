@@ -139,8 +139,16 @@ std::shared_ptr<Var> EqSatIRParser::parse_var() {
         std::string name = parse_str();
         result = std::make_shared<StringVar>(name);
     } else if (is_head("ExprVar")) {
+        ExprVar::Location loc;
+        if (is_head("(Mem)")) {
+            loc = ExprVar::Location::Mem;
+        } else if (is_head("(AMX)")) {
+            loc = ExprVar::Location::AMX;
+        } else {
+            internal_error << "Unknown location at " << std::to_string(curr);
+        }
         auto expr = parse_expr();
-        result = std::make_shared<ExprVar>(expr);
+        result = std::make_shared<ExprVar>(loc, expr);
     } else {
         internal_error << "Unknown variable at " << std::to_string(curr);
     }

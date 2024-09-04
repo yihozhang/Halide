@@ -60,9 +60,13 @@ struct StringVar : public Var {
 };
 
 struct ExprVar : public Var {
+    enum Location {
+        Mem,
+        AMX
+    } loc;
     Expr expr;
-    ExprVar(Expr expr)
-        : expr(std::move(expr)) {
+    ExprVar(Location loc, Expr expr)
+        : loc(loc), expr(std::move(expr)) {
     }
 };
 
@@ -141,7 +145,7 @@ public:
             if (expr.same_as(v->expr)) {
                 return var;
             } else {
-                return std::make_shared<ExprVar>(expr);
+                return std::make_shared<ExprVar>(v->loc, expr);
             }
         }
         internal_error << "Unknown Var type\n";

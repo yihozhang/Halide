@@ -750,7 +750,7 @@ protected:
     }
 };
 
-std::string PLACEHOLDER_PREFIX = "collect_stores_placeholder_";
+std::string PLACEHOLDER_PREFIX = "collectstoresplaceholder";
 
 struct CollectStores : public EqSatIRMutator {
     using EqSatIRMutator::visit;
@@ -758,9 +758,62 @@ struct CollectStores : public EqSatIRMutator {
 
     Stmt visit(const Store *op) override {
         auto no = stores.size();
-        auto placeholder = PLACEHOLDER_PREFIX + std::to_string(no);
+        auto placeholder = PLACEHOLDER_PREFIX + op->name + ".eqsat." + std::to_string(no);
+        placeholder = replace_all(placeholder, "$", "AAA");
+        placeholder = replace_all(placeholder, ".", "BBB");
         stores[placeholder] = op;
         return Store::make(placeholder, op->value, op->index, op->param, op->predicate, op->alignment);
+    }
+};
+
+class RemoveGLoadsAndGVars : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+
+public:
+    struct PrologueStmt {
+        std::string name;
+        Expr expr;
+    };
+    RemoveGLoadsAndGVars(const std::string &prefix)
+        : prefix(prefix) {
+    }
+
+    const std::vector<PrologueStmt> &get_prologues() {
+        return this->prologues;
+    }
+
+protected:
+    std::string prefix;
+    int store_no = 0;
+    std::vector<PrologueStmt> prologues;
+    Expr visit(const GLoad *load) override {
+        if (const StringVar *v = dynamic_cast<const StringVar *>(load->name.get())) {
+            return Load::make(load->type, v->name, EqSatIRMutator::mutate(load->index), load->image, load->param, EqSatIRMutator::mutate(load->predicate), load->alignment);
+        } else if (const ExprVar *v = dynamic_cast<const ExprVar *>(load->name.get())) {
+            // We traverse children first to ensure that the prologues are in the correct order
+            Expr predicate = EqSatIRMutator::mutate(load->predicate);
+            Expr index = EqSatIRMutator::mutate(load->index);
+
+            std::string name = prefix + ".temporary." + std::to_string(store_no++);
+            prologues.push_back({name, mutate(v->expr)});
+            return Load::make(load->type, name, index, load->image, load->param, predicate, load->alignment);
+        } else {
+            internal_error << "GLoad name must be a StringVar or ExprVar\n";
+            return {};
+        }
+    }
+
+    Expr visit(const GVariable *var) override {
+        if (const StringVar *v = dynamic_cast<const StringVar *>(var->name.get())) {
+            return Variable::make(var->type, v->name);
+        } else if (const ExprVar *v = dynamic_cast<const ExprVar*>(var->name.get())) {
+            auto name = prefix + ".temporary." + std::to_string(store_no++);
+            prologues.push_back({name, mutate(v->expr)});
+            return Variable::make(var->type, name);
+        } else {
+            internal_error << "GVariable name must be a StringVar\n";
+            return {};
+        }
     }
 };
 
@@ -777,7 +830,25 @@ struct SubstStores : public EqSatIRMutator {
             << "All stores should have been replaced with a place holder";
         auto it = stores.find(op->name);
         internal_assert(it != stores.end()) << "Store not found";
-        return it->second;
+
+        Stmt s = it->second;
+        auto prefix = replace_all(op->name.substr(PLACEHOLDER_PREFIX.length()), "AAA", "$");
+        prefix = replace_all(prefix, "BBB", ".");
+        RemoveGLoadsAndGVars remover(prefix);
+        s = remover.mutate(s);
+
+        vector<Stmt> stores;
+        for (const auto& prologue: remover.get_prologues()) {
+            int lanes = prologue.expr.type().lanes();
+            stores.push_back(Store::make(prologue.name, prologue.expr, Ramp::make(0, 1, lanes), Parameter(), const_true(lanes), ModulusRemainder()));
+        }
+        stores.push_back(s);
+        s = Block::make(stores);
+        for (auto i = remover.get_prologues().rbegin(); i != remover.get_prologues().rend(); i++) {
+            s = Allocate::make(i->name, i->expr.type(), MemoryType::Auto, {1}, const_true(i->expr.type().lanes()), s);
+        }
+
+        return s;
     }
 };
 
@@ -895,28 +966,6 @@ protected:
     }
 };
 
-class RemoveGLoadsAndGVars : public EqSatIRMutator {
-    using EqSatIRMutator::visit;
-protected:
-    Expr visit(const GLoad *load) override {
-        const StringVar* name = dynamic_cast<const StringVar *>(load->name.get());
-        if (name == nullptr) {
-            internal_error << "GLoad name must be a StringVar\n";
-            return {};
-        }
-        return Load::make(load->type, name->name, EqSatIRMutator::mutate(load->index), load->image, load->param, EqSatIRMutator::mutate(load->predicate), load->alignment);
-    }
-
-    Expr visit(const GVariable *var) override {
-        const StringVar* name = dynamic_cast<const StringVar *>(var->name.get());
-        if (name == nullptr) {
-            internal_error << "GVariable name must be a StringVar\n";
-            return {};
-        }
-        return Variable::make(var->type, name->name);
-    }
-};
-
 }  // namespace EqSatExtensions
 
 Stmt extract_tile_operations(const Stmt &s) {
@@ -953,7 +1002,7 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
         EqSatExtensions::EqSatIRParser parser(optimized);
         auto opvalue = parser.parse_stmt();
 
-        new_stores[name] = EqSatExtensions::RemoveGLoadsAndGVars().mutate(opvalue);
+        new_stores[name] = opvalue;
     }
     if (!amx_synthesized) {
         std::cerr << "amx NOT synthesied\n";
