@@ -70,7 +70,10 @@ int main() {
         // Schedule the updates
         .update()
         .tile(n, c, no, co, ni, ci, 4, 4)
-        // tile r.x is 2 works, while tile r.x is 4 does not.
+        // NOTE: tile r.x is 2 works, while tile r.x is 4 does not.
+        // The reason r.x=4 does not work is because `get_3d_rhs_tile_index` expects a pattern
+        // (bc(..) / bc(..) + bc(..)) * bc(..), but here we get the pattern of
+        // (bc(..) / bc(..) + bc(..)) * bc(..) * bc(..)
         .split(r.x, rxo, rxi, 2)
         .reorder(rxi, ci, ni, rxo, r.y, r.z, co, no, x, y)
         .atomic()
