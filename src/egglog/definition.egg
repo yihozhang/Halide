@@ -113,7 +113,7 @@
 (function ExprVar (Loc Expr) Variable)
 
 ;; list of intrinsics
-; KWayInterleave(i64 k, Expr base, i64 height, i64 width, Expr stride): i64x(height*width)
+; KWayInterleave(i64 k, Expr base, i64 lanes): i64x(height*width)
 
 ;; We don't need StoreAndLoad... Use ExprVar instead
 ; ;; takes an expression over loc1, stores it in loc1, 

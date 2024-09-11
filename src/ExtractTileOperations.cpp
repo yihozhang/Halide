@@ -966,6 +966,43 @@ protected:
     }
 };
 
+class DesugarIntrinsics : public IRMutator {
+    using IRMutator::visit;
+
+protected:
+    Expr visit(const Call *call) override {
+        if (call->name == "KWayInterleave") {
+            std::vector<Expr> args = call->args;
+            internal_assert(args.size() == 3);
+            const int64_t* pk = as_const_int(args[0]);
+            Expr vec = mutate(args[1]);
+            const int64_t* planes = as_const_int(args[2]);
+            if (!pk || !planes) {
+                internal_error << "KWayInterleave requires constant k and lanes\n";
+                return {};
+            }
+            int K = *pk;
+            int lanes = *planes;
+            internal_assert(vec.type().lanes() % lanes == 0) << "Vector size must be a multiple of #lanes\n";
+            internal_assert(lanes % K == 0) << "Number of lanes must be a multiple of k\n";
+            int length = vec.type().lanes() / lanes;
+
+            std::vector<int> indices;
+            for (int i = 0; i < lanes; i += K) {
+                for (int j = 0; j < length; j++) {
+                    for (int k = 0; k < K; k++) {
+                        indices.push_back((i + k) * length + j);
+                    }
+                }
+            }
+            return Shuffle::make({vec}, indices);
+
+        } else {
+            return IRMutator::visit(call);
+        }
+    }
+};
+
 }  // namespace EqSatExtensions
 
 Stmt extract_tile_operations(const Stmt &s) {
@@ -1011,6 +1048,7 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
     }
     result = EqSatExtensions::SubstStores(std::move(new_stores)).mutate(result);
     result = EqSatExtensions::EnforceAMXShape().mutate(result);
+    result = EqSatExtensions::DesugarIntrinsics().mutate(result);
     return result;
 }
 
