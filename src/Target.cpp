@@ -541,6 +541,7 @@ Target::Feature get_host_vulkan_capability(Target t) {
     return cap;
 }
 
+// Keep this list in sync in HalideGeneratorHelpers.cmake
 const std::map<std::string, Target::OS> os_name_map = {
     {"os_unknown", Target::OSUnknown},
     {"linux", Target::Linux},
@@ -562,6 +563,7 @@ bool lookup_os(const std::string &tok, Target::OS &result) {
     return false;
 }
 
+// Keep this list in sync in HalideGeneratorHelpers.cmake
 const std::map<std::string, Target::Arch> arch_name_map = {
     {"arch_unknown", Target::ArchUnknown},
     {"x86", Target::X86},
@@ -1549,7 +1551,7 @@ bool Target::get_runtime_compatible_target(const Target &other, Target &result) 
     // clang-format on
 
     // clang-format off
-    const std::array<Feature, 23> intersection_features = {{
+    const std::array<Feature, 14> intersection_features = {{
         ARMv7s,
         AVX,
         AVX2,
@@ -1568,7 +1570,7 @@ bool Target::get_runtime_compatible_target(const Target &other, Target &result) 
     // clang-format on
 
     // clang-format off
-    const std::array<Feature, 10> matching_features = {{
+    const std::array<Feature, 9> matching_features = {{
         ASAN,
         Debug,
         HexagonDma,
