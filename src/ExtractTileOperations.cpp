@@ -787,9 +787,9 @@ protected:
     int store_no = 0;
     std::vector<PrologueStmt> prologues;
     Expr visit(const GLoad *load) override {
-        if (const StringVar *v = dynamic_cast<const StringVar *>(load->name.get())) {
+        if (const StringVar *v = load->name.get()->to_string_var()) {
             return Load::make(load->type, v->name, EqSatIRMutator::mutate(load->index), load->image, load->param, EqSatIRMutator::mutate(load->predicate), load->alignment);
-        } else if (const ExprVar *v = dynamic_cast<const ExprVar *>(load->name.get())) {
+        } else if (const ExprVar *v = load->name.get()->to_expr_var()) {
             // We traverse children first to ensure that the prologues are in the correct order
             Expr predicate = EqSatIRMutator::mutate(load->predicate);
             Expr index = EqSatIRMutator::mutate(load->index);
@@ -804,9 +804,9 @@ protected:
     }
 
     Expr visit(const GVariable *var) override {
-        if (const StringVar *v = dynamic_cast<const StringVar *>(var->name.get())) {
+        if (const StringVar *v = var->name.get()->to_string_var()) {
             return Variable::make(var->type, v->name);
-        } else if (const ExprVar *v = dynamic_cast<const ExprVar*>(var->name.get())) {
+        } else if (const ExprVar *v = var->name.get()->to_expr_var()) {
             auto name = prefix + ".temporary." + std::to_string(store_no++);
             prologues.push_back({name, mutate(v->expr)});
             return Variable::make(var->type, name);
@@ -991,13 +991,13 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
     auto optimized_programs = split_string(output, "\n");
     bool amx_synthesized = false;
     std::map<std::string, Stmt> new_stores;
-    for (int i = 0; i < optimized_programs.size(); i++) {
+    for (size_t i = 0; i < optimized_programs.size(); i++) {
         if (optimized_programs[i].empty()) {
             continue;
         }
         auto &optimized = optimized_programs[i];
         auto &name = bindings[i].first;
-        amx_synthesized = amx_synthesized || optimized.find("tile_matmul") != -1;
+        amx_synthesized = amx_synthesized || optimized.find("tile_matmul") != string::npos;
 
         EqSatExtensions::EqSatIRParser parser(optimized);
         auto opvalue = parser.parse_stmt();
@@ -1078,77 +1078,77 @@ std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&bindin
 template<>
 void ExprNode<EqSatExtensions::MemToAMX>::accept(IRVisitor *v) const {
     using namespace EqSatExtensions;
-    EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
-    internal_assert(ev) << "MemToAMX can only be visited by EqSatIRVisitor\n";
+    EqSatIRVisitor *ev = (EqSatIRVisitor *) v;
+    internal_assert(!v->is_base_ir_visitor()) << "MemToAMX can only be visited by EqSatIRVisitor\n";
     ev->visit((const MemToAMX *)this);
 }
 template<>
 void ExprNode<EqSatExtensions::AMXToMem>::accept(IRVisitor *v) const {
     using namespace EqSatExtensions;
-    EqSatIRVisitor *ev = dynamic_cast<EqSatIRVisitor *>(v);
-    internal_assert(ev) << "AMXToMem can only be visited by EqSatIRVisitor\n";
+    EqSatIRVisitor *ev = (EqSatIRVisitor *) v;
+    internal_assert(!v->is_base_ir_visitor()) << "AMXToMem can only be visited by EqSatIRVisitor\n";
     ev->visit((const AMXToMem *)this);
 }
 template<>
 void ExprNode<EqSatExtensions::GLoad>::accept(IRVisitor *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "GLoad can only be mutated by EqSatIRMutator\n";
+    EqSatIRVisitor *ev = (EqSatIRVisitor *) v;
+    internal_assert(!v->is_base_ir_visitor()) << "GLoad can only be mutated by EqSatIRVisitor\n";
     ev->visit((const GLoad *)this);
 }
 template<>
 void ExprNode<EqSatExtensions::Computed>::accept(IRVisitor *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "Computed can only be mutated by EqSatIRMutator\n";
+    EqSatIRVisitor *ev = (EqSatIRVisitor *) v;
+    internal_assert(!v->is_base_ir_visitor()) << "Computed can only be mutated by EqSatIRVisitor\n";
     ev->visit((const Computed *)this);
 }
 
 template<>
 void ExprNode<EqSatExtensions::GVariable>::accept(IRVisitor *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "GVariable can only be mutated by EqSatIRMutator\n";
+    EqSatIRVisitor *ev = (EqSatIRVisitor *) v;
+    internal_assert(!v->is_base_ir_visitor()) << "GVariable can only be mutated by EqSatIRVisitor\n";
     ev->visit((const GVariable *)this);
 }
 
 template<>
 Expr ExprNode<EqSatExtensions::MemToAMX>::mutate_expr(IRMutator *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "MemToAMX can only be mutated by EqSatIRMutator\n";
+    EqSatIRMutator *ev = (EqSatIRMutator *) v;
+    internal_assert(!v->is_base_ir_mutator()) << "MemToAMX can only be mutated by EqSatIRMutator\n";
     return ev->visit((const MemToAMX *)this);
 }
 
 template<>
 Expr ExprNode<EqSatExtensions::AMXToMem>::mutate_expr(IRMutator *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "AMXToMem can only be mutated by EqSatIRMutator\n";
+    EqSatIRMutator *ev = (EqSatIRMutator *) v;
+    internal_assert(!v->is_base_ir_mutator()) << "AMXToMem can only be mutated by EqSatIRMutator\n";
     return ev->visit((const AMXToMem *)this);
 }
 
 template<>
 Expr ExprNode<EqSatExtensions::GLoad>::mutate_expr(IRMutator *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "GLoad can only be mutated by EqSatIRMutator\n";
+    EqSatIRMutator *ev = (EqSatIRMutator *) v;
+    internal_assert(!v->is_base_ir_mutator()) << "GLoad can only be mutated by EqSatIRMutator\n";
     return ev->visit((const GLoad *)this);
 }
 
 template<>
 Expr ExprNode<EqSatExtensions::GVariable>::mutate_expr(IRMutator *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "GVariable can only be mutated by EqSatIRMutator\n";
+    EqSatIRMutator *ev = (EqSatIRMutator *) v;
+    internal_assert(!v->is_base_ir_mutator()) << "GVariable can only be mutated by EqSatIRMutator\n";
     return ev->visit((const GVariable *)this);
 }
 
 template<>
 Expr ExprNode<EqSatExtensions::Computed>::mutate_expr(IRMutator *v) const {
     using namespace EqSatExtensions;
-    EqSatIRMutator *ev = dynamic_cast<EqSatIRMutator *>(v);
-    internal_assert(ev) << "Computed can only be mutated by EqSatIRMutator\n";
+    EqSatIRMutator *ev = (EqSatIRMutator *) v;
+    internal_assert(!v->is_base_ir_mutator()) << "Computed can only be mutated by EqSatIRMutator\n";
     return ev->visit((const Computed *)this);
 }
 

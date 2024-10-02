@@ -48,14 +48,22 @@ struct Computed : public ExprNode<Computed> {
     static const IRNodeType _node_type = IRNodeType::Call;
 };
 
+struct StringVar;
+struct ExprVar;
+
 struct Var {
     virtual ~Var() = default;
+    virtual StringVar *to_string_var() { return nullptr; }
+    virtual ExprVar *to_expr_var() { return nullptr; }
 };
 
 struct StringVar : public Var {
     std::string name;
     StringVar(const std::string &name)
         : name(name) {
+    }
+    StringVar *to_string_var() override {
+        return (StringVar *) this;
     }
 };
 
@@ -67,6 +75,10 @@ struct ExprVar : public Var {
     Expr expr;
     ExprVar(Location loc, Expr expr)
         : loc(loc), expr(std::move(expr)) {
+    }
+
+    ExprVar *to_expr_var() override {
+        return (ExprVar *) this;
     }
 };
 
@@ -114,11 +126,17 @@ public:
     }
     virtual void visit(const Computed *e) {
     }
+    virtual bool is_base_ir_visitor() override {
+        return false;
+    }
 };
 
 class EqSatIRMutator : public IRMutator {
 public:
     using IRMutator::visit;
+    virtual bool is_base_ir_mutator() override {
+        return false;
+    }
     virtual Expr visit(const MemToAMX *e) {
         Expr value = mutate(e->expr);
         if (value.same_as(e->expr)) {
@@ -138,9 +156,9 @@ public:
     }
 
     virtual std::shared_ptr<Var> visit(std::shared_ptr<Var> var) {
-        if (auto v = std::dynamic_pointer_cast<StringVar>(var)) {
+        if (var->to_string_var() != nullptr) {
             return var;
-        } else if (auto v = std::dynamic_pointer_cast<ExprVar>(var)) {
+        } else if (auto v = var->to_expr_var()) {
             Expr expr = mutate(v->expr);
             if (expr.same_as(v->expr)) {
                 return var;
