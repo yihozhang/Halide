@@ -12,30 +12,36 @@ bool matmul_bf16(Halide::Target target) {
 
     const int acc = 4096;
 
-    Var x("x"), y("y");
-    ImageParam A(BFloat(16), 2, "lhs");
-    ImageParam B(BFloat(16), 2, "rhs");
+    Var x("x"), y("y"), z("z");
+    ImageParam A(BFloat(16), 2, "A");
+    ImageParam B(BFloat(16), 2, "B");
+    ImageParam C(BFloat(16), 2, "C");
 
-    RDom r(0, acc, "acc");
+    RDom r(0, acc, 0, acc, "acc");
 
     Func mm("matmul");
     mm(x, y) = cast<float>(0);
-    mm(x, y) += cast<float>(cast<float>(A(r.x, y))) * cast<float>(B(x, r.x));
+    // mm(x, w) = A(x, y) * B(y, z) * C(z, w)
+    // A(y, z) * B(z, x) * C(x, w)
+    mm(x, y) += cast<float>(cast<bfloat16_t>(cast<float>(A(r.x, y)) * cast<float>(B(r.y, r.x)))) * cast<float>(C(r.y, x));
 
-    int tile_x = 16;
-    int tile_y = 32;
-    int tile_r = 16;
+    int tile_x = 4;
+    int tile_y = 8;
+    int tile_r = 4;
     Var rxi("rxi"), ryi("ryi");
-    RVar rri("rri"), rro("rro");
+    RVar rxri("rxri"), rxro("rxro");
+    RVar ryri("ryri"), ryro("ryro");
 
     mm.compute_at(mm.in(), x)
         .store_in(MemoryType::AMXTile)
         .update()
         .tile(x, y, rxi, ryi, tile_x, tile_y, TailStrategy::GuardWithIf)
-        .split(r.x, rro, rri, tile_r)
-        .reorder({rri, rxi, ryi, rro, x, y})
+        .split(r.x, rxro, rxri, tile_r)
+        .split(r.y, ryro, ryri, tile_r)
+        .reorder({rxri, ryri, rxi, ryi, rxro, ryro, x, y})
         .atomic()
-        .vectorize(rri)
+        .vectorize(rxri)
+        .vectorize(ryri)
         .vectorize(rxi)
         .vectorize(ryi);
 
