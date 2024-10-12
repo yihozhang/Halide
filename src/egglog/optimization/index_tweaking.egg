@@ -1,0 +1,189 @@
+; prog +=  R"***(
+
+;; Given two index expressions, make-aligned tries to 
+;; un-nest Broadcast and Ramp expressions
+
+(relation make-aligned (Expr Expr))
+
+(rule (
+    (make-aligned a b)
+) (
+    (make-aligned b a)
+))
+
+(rule (
+    (make-aligned (Broadcast e1 b1) (Broadcast e2 b2))
+    (< b1 b2)
+    (= (% b2 b1) 0)
+) (
+    (union (Broadcast e2 b2) (Broadcast (Broadcast e2 (/ b2 b1)) b1))
+))
+
+(rule (
+    (make-aligned (Ramp e1 s1 l1) (Broadcast e2 b2))
+    (< l1 b2)
+    (= (% b2 l1) 0)
+) (
+    (union (Broadcast e2 b2) (Broadcast (Broadcast e2 (/ b2 l1)) l1))
+))
+
+(rule (
+    (make-aligned (Broadcast e1 b1) (Ramp e2 s2 l2))
+    (< b1 l2)
+    (= (% l2 b1) 0)
+
+    (has-type e2 (UIntOrInt sign bits lanes))
+) (
+    (union (Ramp e2 s2 l2) 
+           (Ramp (Ramp e2 s2 (/ l2 b1))
+                 (Bop (Mul) s2 (Broadcast (UIntOrIntImm sign bits (/ l2 b1)) lanes))
+                 b1))
+))
+
+(rule (
+    (make-aligned (Ramp e1 s1 l1) (Ramp e2 s2 l2))
+    (< l1 l2)
+    (= (% l2 l1) 0)
+
+    (has-type e2 (UIntOrInt sign bits lanes))
+) (
+    (union (Ramp e2 s2 l2) 
+           (Ramp (Ramp e2 s2 (/ l2 l1))
+                 (Bop (Mul) s2 (Broadcast (UIntOrIntImm sign bits (/ l2 l1)) lanes))
+                 l1))
+))
+
+;; Propagating down make-aligned
+;; TODO: should we ban the case when l is equal to 1??
+
+(rule (
+    (make-aligned (Ramp e1 s1 l) (Ramp e2 s2 l))
+) (
+    (make-aligned e1 e2)
+))
+
+(rule (
+    (make-aligned (Ramp e1 s1 l) (Broadcast e2 l))
+) (
+    (make-aligned e1 e2)
+))
+
+(rule (
+    (make-aligned (Broadcast e1 b) (Broadcast e2 b))
+) (
+    (make-aligned e1 e2)
+))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Pulling out aligned broadcasts
+;; TODO: explain what this does
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(sort ExprBinFn (Fn (Expr Expr) Expr))
+(datatype InvertedIndex
+    (InvRamp InvertedIndex Expr i64)
+    (InvBroadcast InvertedIndex i64)
+    (InvertedIndexEnd))
+(function assemble-inv-ind (Expr InvertedIndex) Expr)
+(rewrite (assemble-inv-ind e (InvertedIndexEnd)) e)
+(rewrite (assemble-inv-ind e (InvRamp i s l)) 
+         (assemble-inv-ind (Ramp e s l) i))
+(rewrite (assemble-inv-ind e (InvBroadcast i l))
+         (assemble-inv-ind (Broadcast e l) i))
+
+(relation remove-aligned-bc (
+    ;; origin
+    Expr 
+    ;; assmble function for lhs and rhs
+    ExprBinFn 
+    ;; lhs
+    Expr
+    ;; rhs
+    Expr 
+))
+
+(rule (
+    (remove-aligned-bc origin modified left right)
+) (
+    (remove-aligned-bc-impl origin modified left right (InvertedIndexEnd) (InvertedIndexEnd))
+))
+
+(relation remove-aligned-bc-impl (
+    ;; origin
+    Expr 
+    ;; assmble function for lhs and rhs
+    ExprBinFn 
+    ;; lhs
+    Expr
+    ;; rhs
+    Expr 
+    ;; continuation for lhs
+    InvertedIndex 
+    ;; continuation for rhs
+    InvertedIndex
+))
+
+(rule (
+    (remove-aligned-bc-impl origin modified left right inv-left inv-right)
+
+    (= (Broadcast e1+ l) left)
+    (= (Broadcast e2+ l) right)
+    (has-type e1 t)
+    (LanesInType t broadcast-per)
+) (
+    (let new-left (assemble-inv-ind e1+ inv-left))
+    (let new-right (assemble-inv-ind e2+ inv-right))
+    (union origin 
+        ;; TODO add the broadcast back
+        (BroadcastPer
+            broadcast-per
+            (unstable-app modified new-left new-right)
+            l))
+))
+
+(rule (
+    (remove-aligned-bc-impl origin modified left right inv-left inv-right)
+
+    (= (Ramp e1+ s1 l) left)
+    (= (Broadcast e2+ l) right)
+) (
+    (remove-aligned-bc-impl origin modified e1+ e2+ 
+        (InvRamp inv-left s1 l) 
+        (InvBroadcast inv-right l))
+))
+
+(rule (
+    (remove-aligned-bc-impl origin modified left right inv-left inv-right)
+
+    (= (Broadcast e1+ l) left)
+    (= (Ramp e2+ s2 l) right)
+) (
+    (remove-aligned-bc-impl origin modified e1+ e2+ 
+        (InvBroadcast inv-left l)
+        (InvRamp inv-right s2 l))
+))
+
+(rule (
+    (remove-aligned-bc-impl origin modified left right inv-left inv-right)
+
+    (= (Ramp e1+ s1 l) left)
+    (= (Ramp e2+ s2 l) right)
+) (
+    (remove-aligned-bc-impl origin modified e1+ e2+ 
+        (InvRamp inv-left s1 l)
+        (InvRamp inv-right s2 l))
+))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Push down broadcasts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; TODO
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; push down VectorReduce
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; TODO
+
+; )***"; prog += "\n";
