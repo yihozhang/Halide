@@ -178,12 +178,97 @@
 ;; Push down broadcasts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; push down VectorReduce
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO
+(relation remove-innermost-bc-demand (Expr))
+(relation remove-innermost-bc (
+    ;; original
+    Expr
+    ;; removed
+    Expr
+    ))
+
+(rule (
+    (VectorReduce ty (Add) (Bop (Mul) a b))
+) (
+    ;; We only do right child because of commutativity
+    (remove-innermost-bc-demand b)
+))
+
+(rule (
+    (= e (VectorReduce ty (Add)
+        (Bop (Mul) a b)
+    ))
+
+    (remove-innermost-bc b shrinked-b)
+    (has-type shirnked-b arg-type)
+) (
+    (union e (VectorReduce ty (Add)
+        (Bop (Mul) 
+            (VectorReduce arg-type (Add) a)
+            shrinked-b
+            )))
+))
+
+;; Going down
+
+(rule (
+    (remove-innermost-bc-demand (Cast ty e))
+) (
+    (remove-innermost-bc-demand e)
+))
+
+(rule (
+    (remove-innermost-bc-demand (Ramp e s l))
+) (
+    (remove-innermost-bc-demand e)
+))
+
+(rule (
+    (remove-innermost-bc-demand (Broadcast e l))
+    (has-type e ty)
+    (LanesInType ty el)
+    (> el 1)
+) (
+    (remove-innermost-bc-demand e)
+))
+
+(rule (
+    (remove-innermost-bc-demand (Broadcast e l))
+    (has-type e ty)
+    (LanesInType ty 1)
+) (
+    (remove-innermost-bc (Broadcast e l) e)
+))
+
+;; Going back up
+
+(rule (
+    (remove-innermost-bc-demand e)
+    (= e (Cast ty e1))
+    (remove-innermost-bc e1 removed)
+) (
+    (remove-innermost-bc e (Cast ty removed))
+))
+
+(rule (
+    (remove-innermost-bc-demand e)
+    (= e (Broadcast e1 l))
+    (remove-innermost-bc e1 removed)
+) (
+    (remove-innermost-bc e (Broadcast removed l))
+))
+
+(rule (
+    (remove-innermost-bc-demand e)
+    (= e (Ramp e1 s l))
+    (remove-innermost-bc e1 removed)
+) (
+    (remove-innermost-bc e (Ramp removed s l))
+))
+
 
 ; )***"; prog += "\n";

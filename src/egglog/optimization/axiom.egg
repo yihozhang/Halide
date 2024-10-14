@@ -12,17 +12,18 @@
 
 (rewrite (Bop bop a b) (Bop bop b a) :when ((CommBop bop)))
 
-(rewrite (Broadcast x 1) x)
-(rewrite (Broadcast (Load type name index) lanes) 
-         (Load (MultipliedLanes type lanes) name (Broadcast index lanes)))
-(rewrite (Broadcast (Cast type expr) lanes) 
-         (Cast (MultipliedLanes type lanes) (Broadcast expr lanes)))
+(rewrite (BroadcastPer p x 1) x)
+(rewrite (BroadcastPer p (Load type name index) lanes) 
+         (Load (MultipliedLanes type lanes) name (BroadcastPer p index lanes)))
+(rewrite (BroadcastPer p (Cast type expr) lanes) 
+         (Cast (MultipliedLanes type lanes) (BroadcastPer p expr lanes)))
 
 (rewrite (Bop bop (Broadcast a l1) (Broadcast b l2))
          (Broadcast (Bop bop (Broadcast a (/ l1 l2)) b) l2)
     :when ((> l1 l2)
            (= 0 (% l1 l2))))
 
+;; Also see `make-aligned` for the more nested version
 (rewrite (Bop bop (Broadcast a l1) (Broadcast b l2))
          (Broadcast (Bop bop a (Broadcast b (/ l2 l1))) l1)
     :when ((< l1 l2)
@@ -39,8 +40,8 @@
            (= 0 (% l1 l2))))
 
 
-(rewrite (Bop bop (Broadcast a l) (Broadcast b l))
-         (Broadcast (Bop bop a b) l))
+(birewrite (Bop bop (BroadcastPer p a l) (BroadcastPer p b l))
+         (BroadcastPer p (Bop bop a b) l))
 
 (rewrite (Bop add-or-sub (Ramp base stride lanes) (Broadcast x lanes))
          (Ramp (Bop add-or-sub base x) stride lanes)
@@ -75,6 +76,7 @@
         (has-type x (Int b l))))
 (rewrite x (Broadcast x 1) :when ((IsExpr x)))
 ; reorganize a ramp as a 4-column tiles
+; TODO: do we need these rules now we have `make-aligned`?
 (rewrite (Ramp e (IntImm b 1) l) 
          (Ramp (Ramp e (IntImm b 1) 4) (Broadcast (IntImm b 4) 4) (/ l 4)) 
   :when ((= 0 (% l 4))))
