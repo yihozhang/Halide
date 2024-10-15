@@ -9,12 +9,16 @@
 (rewrite (MultipliedLanes (Handle l) x) (Handle (* l x)))
 
 (function LanesInType (Type) i64)
-(rewrite (LanesInType (Int i l)) l)
-(rewrite (LanesInType (UInt i l)) l)
-(rewrite (LanesInType (Float i l)) l)
-(rewrite (LanesInType (BFloat i l)) l)
-(rewrite (LanesInType (Handle l)) l)
-
+(rule ((= t (Int i l)))
+      ((set (LanesInType t) l)))
+(rule ((= t (UInt i l)))
+      ((set (LanesInType t) l)))
+(rule ((= t (Float i l)))
+      ((set (LanesInType t) l)))
+(rule ((= t (BFloat i l)))
+      ((set (LanesInType t) l)))
+(rule ((= t (Handle l)))
+      ((set (LanesInType t) l)))
 
 (relation has-type (Expr Type))
 (rule ((= e (Cast ty Expr))) ((has-type e ty)))
@@ -23,6 +27,10 @@
     (= e (Bop bop e1 e2))
     (has-type e1 t)
     (has-type e2 t)
+) ((has-type e t)))
+(rule (
+    (= e (Uop uop e1))
+    (has-type e1 t)
 ) ((has-type e t)))
 (rule ((= e (Select cond tval fval))
     (has-type cond (UInt 1 _lanes))
@@ -45,5 +53,20 @@
 (rule ((= e (VectorReduce ty BinOp Expr))) 
     ((has-type e ty)))
 (rule ((= e (IntImm bits i64))) ((has-type e (Int bits 1))))
+(rule ((= e (UIntImm bits i64))) ((has-type e (UInt bits 1))))
+(rule ((= e (FloatImm bits f64))) ((has-type e (Float bits 1))))
 
+;; extensions
+(rule (
+    (= e (Loc2Loc l1 l2 e1))
+    (has-type e1 t)
+) (
+    (has-type e t)
+))
+(rule (
+    (= e (BroadcastPer p e1 l))
+    (has-type e1 t)
+) (
+    (has-type e (MultipliedLanes t l))
+))
 ; )***"; prog += "\n";

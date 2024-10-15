@@ -7,18 +7,18 @@
 
 ;; Conversion between `Broadcast` and `BroadcastPer`
 (rule (
-    (Broadcast e lo)
+    (= bc (Broadcast e lo))
     (has-type e t)
     (= p (LanesInType t))
 ) (
-    (BroadcastPer p e lo)
+    (union bc (BroadcastPer p e lo))
 ))
 (rule (
-    (BroadcastPer p e lo)
+    (= bcp (BroadcastPer p e lo))
     (has-type e t)
     (= p (LanesInType t))
 ) (
-    (Broadcast e lo)
+    (union bcp (Broadcast e lo))
 ))
 ;; end conversion
 
@@ -29,6 +29,14 @@
 
 (rewrite (Bop bop a b) (Bop bop b a) :when ((CommBop bop)))
 
+
+;; broadcast related axioms
+; (rewrite (Broadcast x 1) x)
+; (rewrite (Broadcast (Load type name index) lanes) 
+;          (Load (MultipliedLanes type lanes) name (Broadcast index lanes)))
+; (rewrite (Broadcast (Cast type expr) lanes) 
+;          (Cast (MultipliedLanes type lanes) (Broadcast expr lanes)))
+;; same rules generalized to BroadcastPer
 (rewrite (BroadcastPer p x 1) x)
 (rewrite (BroadcastPer p (Load type name index) lanes) 
          (Load (MultipliedLanes type lanes) name (BroadcastPer p index lanes)))
