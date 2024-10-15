@@ -76,10 +76,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pulling out aligned broadcasts
-;; TODO: explain what this does
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(sort ExprBinFn (Fn (Expr Expr) Expr))
+(sort ExprBinFn (UnstableFn (Expr Expr) Expr))
 (datatype InvertedIndex
     (InvRamp InvertedIndex Expr i64)
     (InvBroadcast InvertedIndex i64)
@@ -91,6 +90,15 @@
 (rewrite (assemble-inv-ind e (InvBroadcast i l))
          (assemble-inv-ind (Broadcast e l) i))
 
+;; Main interface
+;;
+;; This relation kicks off the following procedure:
+;;  1. it scans lhs and rhs in lock step, finds the first
+;;     "co-located" Broadcasts with same broadcast lanes, and removes them.
+;;  2. it apply the assemble function to the modified lhs and rhs
+;;     applies the `BroadcastPer` to the assembled result.
+;;  3. at this stage, the result should be equivalent to the original expression,
+;;     and remove-aligned-bc will union the result with the original expression.
 (relation remove-aligned-bc (
     ;; origin
     Expr 
@@ -100,12 +108,6 @@
     Expr
     ;; rhs
     Expr 
-))
-
-(rule (
-    (remove-aligned-bc origin modified left right)
-) (
-    (remove-aligned-bc-impl origin modified left right (InvertedIndexEnd) (InvertedIndexEnd))
 ))
 
 (relation remove-aligned-bc-impl (
@@ -124,17 +126,22 @@
 ))
 
 (rule (
+    (remove-aligned-bc origin modified left right)
+) (
+    (remove-aligned-bc-impl origin modified left right (InvertedIndexEnd) (InvertedIndexEnd))
+))
+
+(rule (
     (remove-aligned-bc-impl origin modified left right inv-left inv-right)
 
     (= (Broadcast e1+ l) left)
     (= (Broadcast e2+ l) right)
     (has-type e1 t)
-    (LanesInType t broadcast-per)
+    (= broadcast-per (LanesInType t))
 ) (
     (let new-left (assemble-inv-ind e1+ inv-left))
     (let new-right (assemble-inv-ind e2+ inv-right))
     (union origin 
-        ;; TODO add the broadcast back
         (BroadcastPer
             broadcast-per
             (unstable-app modified new-left new-right)
@@ -172,6 +179,32 @@
     (remove-aligned-bc-impl origin modified e1+ e2+ 
         (InvRamp inv-left s1 l)
         (InvRamp inv-right s2 l))
+))
+
+;; Instantiation of remove-aligned-bc for general matrix multiplication
+(function matrix-multiplication-cont (
+    ;; out-lanes
+    i64
+    ;; tot-lanes
+    i64
+    ;; lhs
+    Expr
+    ;; rhs
+    Expr
+    ) Expr)
+
+(rewrite (matrix-multiplication-cont out-lanes tot-lanes lhs rhs)
+         (VectorReduce (Int 32 out-lanes) (Add)
+             (Bop (Mul)
+                 (Cast (Int 32 tot-lanes) lhs)
+                 (Cast (Int 32 tot-lanes) rhs))))
+(rule (
+    (= e (VectorReduce (Int 32 out-lanes) (Add)
+        (Bop (Mul)
+            (Cast (Int 32 tot-lanes) lhs)
+            (Cast (Int 32 tot-lanes) rhs))))
+) (
+    (remove-aligned-bc e (unstable-fn "matrix-multiplication-cont" out-lanes tot-lanes) lhs rhs)
 ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -230,8 +263,7 @@
 (rule (
     (remove-innermost-bc-demand (Broadcast e l))
     (has-type e ty)
-    (LanesInType ty el)
-    (> el 1)
+    (> (LanesInType ty) 1)
 ) (
     (remove-innermost-bc-demand e)
 ))
@@ -239,7 +271,7 @@
 (rule (
     (remove-innermost-bc-demand (Broadcast e l))
     (has-type e ty)
-    (LanesInType ty 1)
+    (= (LanesInType ty) 1)
 ) (
     (remove-innermost-bc (Broadcast e l) e)
 ))

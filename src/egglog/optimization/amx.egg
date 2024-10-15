@@ -347,8 +347,11 @@
                    (vec-of (IntImm16 row)
                            (IntImm16 colbytes)
                            (Var (Handle 1) (ExprVar (Mem) value))
-                           (Computed)
-                           (Computed))))
+                           ;; (Computed)
+                           (IntImm32 0) ;; offset
+                           ;; (Computed)
+                           (IntImm32 colbytes) ;; stride
+                           )))
     (union e new-e)
 ))
 
@@ -363,8 +366,11 @@
                    (vec-of (IntImm16 row)
                            (IntImm16 colbytes)
                            (Var (Handle 1) (ExprVar (Mem) value))
-                           (Computed)
-                           (Computed))))
+                           ;; (Computed)
+                           (IntImm32 0) ;; offset
+                           ;; (Computed)
+                           (IntImm32 colbytes) ;; stride
+                           )))
     (union e new-e)
 ))
 
@@ -400,8 +406,14 @@
 ;; Or if the statement has the form (Store name (AMX2Mem value) index),
 ;; and the index has a specific pattern, then we can directly tile_store it.
 
-(rewrite (AMX2Mem value) (Load ty (ExprVar (AMX) value) (Computed))
-    :when ((has-type value ty)))
+;; (rewrite (AMX2Mem value) (Load ty (ExprVar (AMX) value) (Computed))
+;;     :when ((has-type value ty)))
+(rewrite (AMX2Mem value) 
+         (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent))
+    :when (
+        (has-type value ty)
+        (= extent (LanesInType ty))
+    ))
 
 (rule (
     (= s (Store store-name (AMX2Mem tile) index))

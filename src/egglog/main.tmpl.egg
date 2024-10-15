@@ -3,6 +3,7 @@
 (include "analysis/typechecking.egg")
 (include "optimization/axiom.egg")
 (include "optimization/constant_folding.egg")
+(include "optimization/index_tweaking.egg")
 (include "optimization/amx.egg")
 
 (include "INPUT")

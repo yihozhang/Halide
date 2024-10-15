@@ -5,6 +5,23 @@
 ;; Axiomatic rewrites
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Conversion between `Broadcast` and `BroadcastPer`
+(rule (
+    (Broadcast e lo)
+    (has-type e t)
+    (= p (LanesInType t))
+) (
+    (BroadcastPer p e lo)
+))
+(rule (
+    (BroadcastPer p e lo)
+    (has-type e t)
+    (= p (LanesInType t))
+) (
+    (Broadcast e lo)
+))
+;; end conversion
+
 (rewrite 
     (Broadcast (Broadcast x l0) l1)
     (Broadcast x (* l0 l1))
