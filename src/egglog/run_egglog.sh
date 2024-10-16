@@ -27,4 +27,4 @@ prog="$main_prog
 
 $extract_prog"
 
-printf '%s\n' "$prog" | egglog
+printf '%s\n' "$prog" | egglog-halide-sidecar

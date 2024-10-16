@@ -1,5 +1,36 @@
 ; prog +=  R"***(
 
-(run 80)
+(ruleset keep-best)
+(rule () ((keep-best "a")) :ruleset keep-best)
+; (run 20)
+
+
+(run-schedule
+;   (repeat 2
+    ; (run keep-best))
+    ; (repeat 3 (run))
+    ; (repeat 20 (run canonicalize))
+    (repeat 12 (run) (saturate assemble) (run canonicalize))
+    ; (run canonicalize)
+    (saturate assemble)
+    (repeat 4 (run))
+)
+
+; (run-schedule (repeat 3
+;     (run keep-best)
+;     (repeat 10 (run canonicalize))
+;     (repeat 15 (run))
+;     (repeat 10 (run canonicalize))
+;     )
+;     )
+
+(print-size remove-aligned-bc)
+(print-size assemble-inv-ind)
+
+(ruleset debug)
+(rule ((= a (Mem2AMX (BroadcastPer 16 e l))) (> l 1))
+((extract l) (extract e)) :ruleset debug)
+(run-schedule (run debug))
+; (print-function remove-aligned-bc 10)
 
 ; )***"; prog += "\n";

@@ -102,11 +102,11 @@
 (rewrite x (Broadcast x 1) :when ((IsExpr x)))
 ; reorganize a ramp as a 4-column tiles
 ; TODO: do we need these rules now we have `make-aligned`?
-(rewrite (Ramp e (IntImm b 1) l) 
-         (Ramp (Ramp e (IntImm b 1) 4) (Broadcast (IntImm b 4) 4) (/ l 4)) 
-  :when ((= 0 (% l 4))))
-(rewrite (Ramp e (IntImm b 1) l) 
-         (Ramp (Ramp e (IntImm b 1) 2) (Broadcast (IntImm b 2) 2) (/ l 2)) 
-  :when ((= 0 (% l 2))))
+; (rewrite (Ramp e (IntImm b 1) l) 
+;          (Ramp (Ramp e (IntImm b 1) 4) (Broadcast (IntImm b 4) 4) (/ l 4)) 
+;   :when ((= 0 (% l 4))))
+; (rewrite (Ramp e (IntImm b 1) l) 
+;          (Ramp (Ramp e (IntImm b 1) 2) (Broadcast (IntImm b 2) 2) (/ l 2)) 
+;   :when ((= 0 (% l 2))))
 
 ; )***"; prog += "\n";

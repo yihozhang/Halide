@@ -256,45 +256,86 @@
 
 ; Int8/UInt8
 (rule (
-    (= e (Mem2AMX
-        (Bop (Add) 
+    (= e (Bop (Add) 
             (VectorReduce (Int 32 out-lanes) (Add) 
                 (Bop (Mul) 
                     (Cast (Int 32 tot-lanes) lhs) 
                     (Cast (Int 32 tot-lanes) rhs))
                 )
-            (AMX2Mem mat))))
+            mat))
     (= out-lanes (* x-lanes y-lanes))
     (= tot-lanes (* out-lanes r-lanes))
 
     (amx-int/uint-lhs lhs x-lanes y-lanes r-lanes new-lhs)
     (amx-int/uint-rhs rhs x-lanes y-lanes r-lanes new-rhs)
 ) (
-    (let new-e (Call "tile_matmul" (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) mat new-lhs new-rhs)))
-    (AMXShape e x-lanes (* y-lanes 4))
-    (union e new-e)
+    (let new-e (Call "tile_matmul" (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) (Mem2AMX mat) new-lhs new-rhs)))
+    (AMXShape new-e x-lanes (* y-lanes 4))
+    (union e (AMX2Mem new-e))
+))
+
+;; Same rule, but does C = AxB instead of C = AxB+C
+(rule (
+    (= e (VectorReduce (Int 32 out-lanes) (Add) 
+            (Bop (Mul) 
+                (Cast (Int 32 tot-lanes) lhs) 
+                (Cast (Int 32 tot-lanes) rhs))
+            ))
+    (= out-lanes (* x-lanes y-lanes))
+    (= tot-lanes (* out-lanes r-lanes))
+
+    (amx-int/uint-lhs lhs x-lanes y-lanes r-lanes new-lhs)
+    (amx-int/uint-rhs rhs x-lanes y-lanes r-lanes new-rhs)
+) (
+    (let initial (Call "tile_zero" (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)))))
+    (let new-e (Call "tile_matmul" (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) initial new-lhs new-rhs)))
+    (AMXShape new-e x-lanes (* y-lanes 4))
+    (union e (AMX2Mem new-e))
 ))
 
 ; Float16
 (rule (
-    (= e (Mem2AMX
-        (Bop (Add) 
+    (= e (Bop (Add) 
         (VectorReduce (Float 32 out-lanes) (Add) 
             (Bop (Mul) 
                 (Cast (Float 32 tot-lanes) lhs)
                 (Cast (Float 32 tot-lanes) rhs))
             )
-        (AMX2Mem mat))))
+        mat))
     (= out-lanes (* x-lanes y-lanes))
     (= tot-lanes (* out-lanes r-lanes))
 
     (amx-float-lhs lhs x-lanes y-lanes r-lanes new-lhs)
     (amx-float-rhs rhs x-lanes y-lanes r-lanes new-rhs)
 ) (
-    (let new-e (Call "tile_matmul" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) mat new-lhs new-rhs)))
-    (AMXShape e x-lanes (* y-lanes 4))
-    (union e new-e)
+    (let new-e (Call "tile_matmul" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) (Mem2AMX mat) new-lhs new-rhs)))
+    (AMXShape new-e x-lanes (* y-lanes 4))
+    (union e (AMX2Mem new-e))
 ))
+
+(rule (
+    (= e
+        (VectorReduce (Float 32 out-lanes) (Add) 
+            (Bop (Mul) 
+                (Cast (Float 32 tot-lanes) lhs)
+                (Cast (Float 32 tot-lanes) rhs))
+            ))
+    (= out-lanes (* x-lanes y-lanes))
+    (= tot-lanes (* out-lanes r-lanes))
+
+    (amx-float-lhs lhs x-lanes y-lanes r-lanes new-lhs)
+    (amx-float-rhs rhs x-lanes y-lanes r-lanes new-rhs)
+) (
+    (let initial (Call "tile_zero" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)))))
+    (let new-e (Call "tile_matmul" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) initial new-lhs new-rhs)))
+    (AMXShape new-e x-lanes (* y-lanes 4))
+    (union e (AMX2Mem new-e))
+))
+
+(rewrite (Mem2AMX (AMX2Mem e)) e)
+(rewrite (AMX2Mem (Mem2AMX e)) e)
+(birewrite (BroadcastPer p (Mem2AMX e) l) (Mem2AMX (BroadcastPer p e l)))
+(birewrite (AMX2Mem (BroadcastPer p e l)) (BroadcastPer p (AMX2Mem e) l))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tilezero
