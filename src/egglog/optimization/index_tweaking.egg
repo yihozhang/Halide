@@ -11,6 +11,7 @@
     (make-aligned b a)
 ) :ruleset canonicalize)
 
+;; can do prime factorization to further generalize these rules
 (rule (
     (make-aligned (Broadcast e1 b1) (Broadcast e2 b2))
     (< b1 b2)
@@ -18,7 +19,7 @@
     (!= b1 1)
 ) (
     (union (Broadcast e2 b2) (Broadcast (Broadcast e2 (/ b2 b1)) b1))
-    ; (subsume (Broadcast e2 b2))
+    (subsume (Broadcast e2 b2))
 ) :ruleset canonicalize)
 
 (rule (
@@ -28,7 +29,7 @@
     (!= l1 1)
 ) (
     (union (Broadcast e2 b2) (Broadcast (Broadcast e2 (/ b2 l1)) l1))
-    ; (subsume (Broadcast e2 b2))
+    (subsume (Broadcast e2 b2))
 ) :ruleset canonicalize)
 
 (rule (
@@ -43,7 +44,7 @@
            (Ramp (Ramp e2 s2 (/ l2 b1))
                  (Bop (Mul) s2 (Broadcast (UIntOrIntImm sign bits (/ l2 b1)) lanes))
                  b1))
-    ; (subsume (Ramp e2 s2 l2))
+    (subsume (Ramp e2 s2 l2))
 ) :ruleset canonicalize)
 
 (rule (
@@ -58,7 +59,7 @@
            (Ramp (Ramp e2 s2 (/ l2 l1))
                  (Bop (Mul) s2 (Broadcast (UIntOrIntImm sign bits (/ l2 l1)) lanes))
                  l1))
-    ; (subsume (Ramp e2 s2 l2))
+    (subsume (Ramp e2 s2 l2))
 ) :ruleset canonicalize)
 
 ;; Propagating down make-aligned
@@ -109,22 +110,23 @@
 ;; Pulling out aligned broadcasts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(sort ExprBinFn (UnstableFn (Expr Expr) Expr))
+(sort I64ExprBinFn (UnstableFn (i64 Expr Expr) Expr))
 (datatype InvertedIndex
     (InvRamp InvertedIndex Expr i64)
     (InvBroadcast InvertedIndex i64)
     (InvertedIndexEnd))
 ; TODO: support multiplicity in assemble-inv-ind
 (function assemble-inv-ind (
+    i64 ;; multiplicity
     Expr 
     InvertedIndex) Expr :unextractable)
-(rewrite (assemble-inv-ind e (InvertedIndexEnd)) e 
+(rewrite (assemble-inv-ind m e (InvertedIndexEnd)) e 
     :ruleset assemble)
-(rewrite (assemble-inv-ind e (InvRamp i s l)) 
-         (assemble-inv-ind (Ramp e s l) i)
+(rewrite (assemble-inv-ind m e (InvRamp i (Broadcast s sl) l)) 
+         (assemble-inv-ind m (Ramp e (Broadcast s (/ sl m)) l) i)
     :ruleset assemble)
-(rewrite (assemble-inv-ind e (InvBroadcast i l))
-         (assemble-inv-ind (Broadcast e l) i)
+(rewrite (assemble-inv-ind m e (InvBroadcast i l))
+         (assemble-inv-ind m (Broadcast e l) i)
     :ruleset assemble)
 
 ;; Main interface
@@ -140,7 +142,7 @@
     ;; origin
     Expr 
     ;; assmble function for lhs and rhs
-    ExprBinFn 
+    I64ExprBinFn 
     ;; lhs
     Expr
     ;; rhs
@@ -151,7 +153,7 @@
     ;; origin
     Expr 
     ;; assmble function for lhs and rhs
-    ExprBinFn 
+    I64ExprBinFn 
     ;; lhs
     Expr
     ;; rhs
@@ -173,15 +175,16 @@
 
     (= (Broadcast e1+ l) left)
     (= (Broadcast e2+ l) right)
+    (!= l 1)
     (has-type e1+ t)
     (= broadcast-per (LanesInType t))
 ) (
-    (let new-left (assemble-inv-ind e1+ inv-left))
-    (let new-right (assemble-inv-ind e2+ inv-right))
+    (let new-left (assemble-inv-ind l e1+ inv-left))
+    (let new-right (assemble-inv-ind l e2+ inv-right))
     (union origin 
         (BroadcastPer
             broadcast-per
-            (unstable-app modified new-left new-right)
+            (unstable-app modified l new-left new-right)
             l))
 ) :ruleset canonicalize)
 
@@ -230,12 +233,15 @@
     i64
     ;; tot-lanes
     i64
+    ;; multiplicity
+    i64
     ;; lhs
     Expr
     ;; rhs
     Expr
     ) Expr :unextractable)
 
+;; TODO: explain what multiplicity does
 (function matrix-multiplication-float-cont (
     ;; lhs-name
     Variable
@@ -245,6 +251,8 @@
     i64
     ;; tot-lanes
     i64
+    ;; multiplicity
+    i64
     ;; lhs
     Expr
     ;; rhs
@@ -253,7 +261,7 @@
     :unextractable)
     ; )
 
-(rewrite (matrix-multiplication-int/uint-cont signed lhs-name rhs-name out-lanes tot-lanes lhs-idx rhs-idx)
+(rewrite (matrix-multiplication-int/uint-cont signed lhs-name rhs-name old-out-lanes old-tot-lanes m lhs-idx rhs-idx)
          (VectorReduce (UIntOrInt signed 32 out-lanes) (Add)
              (Bop (Mul)
                  (Cast (UIntOrInt signed 32 tot-lanes)
@@ -261,10 +269,12 @@
                  (Cast (UIntOrInt signed 32 tot-lanes) 
                     (Load (UIntOrInt signed 8 tot-lanes) rhs-name rhs-idx)
                     ))) 
+    :when ((= out-lanes (/ old-out-lanes m))
+           (= tot-lanes (/ old-tot-lanes m)))
     :ruleset assemble
     )
 
-(rewrite (matrix-multiplication-float-cont lhs-name rhs-name out-lanes tot-lanes lhs-idx rhs-idx)
+(rewrite (matrix-multiplication-float-cont lhs-name rhs-name old-out-lanes old-tot-lanes m lhs-idx rhs-idx)
          (VectorReduce (Float 32 out-lanes) (Add)
              (Bop (Mul)
                  (Cast (Float 32 tot-lanes)
@@ -272,6 +282,8 @@
                  (Cast (Float 32 tot-lanes)
                     (Load (BFloat 16 tot-lanes) rhs-name rhs-idx)
                     )))
+    :when ((= out-lanes (/ old-out-lanes m))
+           (= tot-lanes (/ old-tot-lanes m)))
     :ruleset assemble
     )
 
@@ -308,6 +320,7 @@
 ;; push down VectorReduce
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; ;; TODO: decompose remove-innermost-bc into pull-out-bc rule and match rule
 ; (relation remove-innermost-bc-demand (Expr))
 ; (relation remove-innermost-bc (
 ;     ;; original

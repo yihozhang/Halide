@@ -31,11 +31,12 @@
 
 
 ;; broadcast related axioms
-; (rewrite (Broadcast x 1) x)
-; (rewrite (Broadcast (Load type name index) lanes) 
-;          (Load (MultipliedLanes type lanes) name (Broadcast index lanes)))
-; (rewrite (Broadcast (Cast type expr) lanes) 
-;          (Cast (MultipliedLanes type lanes) (Broadcast expr lanes)))
+;; TODO: these rules are still not replaceable, why??
+(rewrite (Broadcast x 1) x)
+(rewrite (Broadcast (Load type name index) lanes) 
+         (Load (MultipliedLanes type lanes) name (Broadcast index lanes)))
+(rewrite (Broadcast (Cast type expr) lanes) 
+         (Cast (MultipliedLanes type lanes) (Broadcast expr lanes)))
 ;; same rules generalized to BroadcastPer
 (rewrite (BroadcastPer p x 1) x)
 (rewrite (BroadcastPer p (Load type name index) lanes) 

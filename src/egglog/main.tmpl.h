@@ -14,8 +14,11 @@ auto EGGLOG_PROG = [](std::vector<std::pair<std::string, std::string>>&& binding
     
 #include "schedule.egg"
 
+    std::string input_names;
     for (auto [name, _src] : bindings) {
         prog += "(extract " + name + ")\n";
+        input_names += '\"' + name + '\"' + " ";
     }
+    prog = std::regex_replace(prog, std::regex("__INPUTS__"), input_names);
     return prog;
 };

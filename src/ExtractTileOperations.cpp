@@ -15,6 +15,8 @@
 #include <unistd.h>
 #include <unordered_set>
 #include <utility>
+#include <string>
+#include <regex>
 
 /** \file Support extraction of AMX instructions. */
 
@@ -1061,7 +1063,7 @@ std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&bindin
     // Write the program to a file
     std::cout << "Writing egglog program to " << filename << std::endl;
     std::ofstream file(filename);
-    file << egglog_prog;
+    file << egglog_prog << std::flush;
 
     int pipe_stdin[2];
     int pipe_stdout[2];
@@ -1078,7 +1080,7 @@ std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&bindin
     }
 
     if (pid == 0) {
-        const char *argv[] = {"egglog", nullptr};
+        const char *argv[] = {"egglog-halide-sidecar", nullptr};
         close(pipe_stdin[1]);
         close(pipe_stdout[0]);
 

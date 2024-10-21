@@ -9,4 +9,5 @@
 
 (include "INPUT")
 
-(include "schedule.egg")
+; The schedule is imported by run_egglog.sh
+;; (include "schedule.egg")

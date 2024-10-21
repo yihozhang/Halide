@@ -455,6 +455,8 @@
         (has-type value ty)
         (= extent (LanesInType ty))
     ))
+; de-specialization
+(rewrite (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)) (AMX2Mem value))
 
 (rule (
     (= s (Store store-name (AMX2Mem tile) index))
