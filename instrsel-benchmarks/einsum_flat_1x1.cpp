@@ -23,7 +23,7 @@ bool matmul_bf16(Halide::Target target) {
     mm(x, y) = cast<float>(0);
     // mm(x, w) = A(x, y) * B(y, z) * C(z, w)
     // A(y, z) * B(z, x) * C(x, w)
-    mm(x, y) += cast<float>(cast<bfloat16_t>(cast<float>(A(r.x, y)) * cast<float>(B(r.y, r.x)))) * cast<float>(C(r.y, x));
+    mm(x, y) += cast<float>(cast<bfloat16_t>(cast<float>(A(r.x, y)) * cast<float>(B(r.y, r.x)))) * cast<float>(C(x, r.y));
 
     int tile_x = 4;
     int tile_y = 8;

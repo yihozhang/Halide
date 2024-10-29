@@ -110,20 +110,23 @@
 ;; Pulling out aligned broadcasts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(sort I64ExprBinFn (UnstableFn (i64 Expr Expr) Expr))
+(sort I64ExprBinFn (UnstableFn (i64 i64 Expr Expr) Expr))
 (datatype InvertedIndex
     (InvRamp InvertedIndex Expr i64)
     (InvBroadcast InvertedIndex i64)
     (InvertedIndexEnd))
-; TODO: support multiplicity in assemble-inv-ind
 (function assemble-inv-ind (
     i64 ;; multiplicity
     Expr 
     InvertedIndex) Expr :unextractable)
+; (rule ((= root (assemble-inv-ind m e (InvertedIndexEnd))))
+; ((union root e)
+; (extract e)) :ruleset assemble)
 (rewrite (assemble-inv-ind m e (InvertedIndexEnd)) e 
     :ruleset assemble)
 (rewrite (assemble-inv-ind m e (InvRamp i (Broadcast s sl) l)) 
          (assemble-inv-ind m (Ramp e (Broadcast s (/ sl m)) l) i)
+    :when ((= (% sl m) 0))
     :ruleset assemble)
 (rewrite (assemble-inv-ind m e (InvBroadcast i l))
          (assemble-inv-ind m (Broadcast e l) i)
@@ -134,8 +137,7 @@
 ;; This relation kicks off the following procedure:
 ;;  1. it scans lhs and rhs in lock step, finds the first
 ;;     "co-located" Broadcasts with same broadcast lanes, and removes them.
-;;  2. it apply the assemble function to the modified lhs and rhs
-;;     applies the `BroadcastPer` to the assembled result.
+;;  2. it apply the assemble function to the modified lhs and rhs.
 ;;  3. at this stage, the result should be equivalent to the original expression,
 ;;     and remove-aligned-bc will union the result with the original expression.
 (relation remove-aligned-bc (
@@ -181,11 +183,7 @@
 ) (
     (let new-left (assemble-inv-ind l e1+ inv-left))
     (let new-right (assemble-inv-ind l e2+ inv-right))
-    (union origin 
-        (BroadcastPer
-            broadcast-per
-            (unstable-app modified l new-left new-right)
-            l))
+    (union origin (unstable-app modified broadcast-per l new-left new-right))
 ) :ruleset canonicalize)
 
 (rule (
@@ -193,6 +191,7 @@
 
     (= (Ramp e1+ s1 l) left)
     (= (Broadcast e2+ l) right)
+    (!= l 1)
 ) (
     (remove-aligned-bc-impl origin modified e1+ e2+ 
         (InvRamp inv-left s1 l) 
@@ -204,6 +203,7 @@
 
     (= (Broadcast e1+ l) left)
     (= (Ramp e2+ s2 l) right)
+    (!= l 1)
 ) (
     (remove-aligned-bc-impl origin modified e1+ e2+ 
         (InvBroadcast inv-left l)
@@ -215,7 +215,9 @@
 
     (= (Ramp e1+ s1 l) left)
     (= (Ramp e2+ s2 l) right)
+    (!= l 1)
 ) (
+    (panic "remove-aligned-bc-impl: Ramp-Ramp case not supported")
     (remove-aligned-bc-impl origin modified e1+ e2+ 
         (InvRamp inv-left s1 l)
         (InvRamp inv-right s2 l))
@@ -232,6 +234,8 @@
     ;; out-lanes
     i64
     ;; tot-lanes
+    i64
+    ;; broadcast-per
     i64
     ;; multiplicity
     i64
@@ -251,6 +255,8 @@
     i64
     ;; tot-lanes
     i64
+    ;; broadcast-per
+    i64
     ;; multiplicity
     i64
     ;; lhs
@@ -259,29 +265,36 @@
     Expr
     ) Expr
     :unextractable)
-    ; )
 
-(rewrite (matrix-multiplication-int/uint-cont signed lhs-name rhs-name old-out-lanes old-tot-lanes m lhs-idx rhs-idx)
-         (VectorReduce (UIntOrInt signed 32 out-lanes) (Add)
-             (Bop (Mul)
-                 (Cast (UIntOrInt signed 32 tot-lanes)
-                    (Load (UIntOrInt signed 8 tot-lanes) lhs-name lhs-idx))
-                 (Cast (UIntOrInt signed 32 tot-lanes) 
-                    (Load (UIntOrInt signed 8 tot-lanes) rhs-name rhs-idx)
-                    ))) 
+(rewrite (matrix-multiplication-int/uint-cont signed lhs-name rhs-name old-out-lanes old-tot-lanes broadcast-per m lhs-idx rhs-idx)
+         ;; (/ tot-lanes out-lanes) computes how many values are reduced into one value
+         ;; We divide broadcast-per by this to account for the actual broadcasting after reduction
+         (BroadcastPer (/ broadcast-per (/ tot-lanes out-lanes))
+            (VectorReduce (UIntOrInt signed 32 out-lanes) (Add)
+                (Bop (Mul)
+                    (Cast (UIntOrInt signed 32 tot-lanes)
+                        (Load (UIntOrInt signed 8 tot-lanes) lhs-name lhs-idx))
+                    (Cast (UIntOrInt signed 32 tot-lanes) 
+                        (Load (UIntOrInt signed 8 tot-lanes) rhs-name rhs-idx)
+                        )))
+            m
+         )
     :when ((= out-lanes (/ old-out-lanes m))
            (= tot-lanes (/ old-tot-lanes m)))
     :ruleset assemble
     )
 
-(rewrite (matrix-multiplication-float-cont lhs-name rhs-name old-out-lanes old-tot-lanes m lhs-idx rhs-idx)
-         (VectorReduce (Float 32 out-lanes) (Add)
-             (Bop (Mul)
-                 (Cast (Float 32 tot-lanes)
-                    (Load (BFloat 16 tot-lanes) lhs-name lhs-idx))
-                 (Cast (Float 32 tot-lanes)
-                    (Load (BFloat 16 tot-lanes) rhs-name rhs-idx)
-                    )))
+(rewrite (matrix-multiplication-float-cont lhs-name rhs-name old-out-lanes old-tot-lanes broadcast-per m lhs-idx rhs-idx)
+         (BroadcastPer (/ broadcast-per (/ tot-lanes out-lanes))
+            (VectorReduce (Float 32 out-lanes) (Add)
+                (Bop (Mul)
+                    (Cast (Float 32 tot-lanes)
+                        (Load (BFloat 16 tot-lanes) lhs-name lhs-idx))
+                    (Cast (Float 32 tot-lanes)
+                        (Load (BFloat 16 tot-lanes) rhs-name rhs-idx)
+                        )))
+            m
+         )
     :when ((= out-lanes (/ old-out-lanes m))
            (= tot-lanes (/ old-tot-lanes m)))
     :ruleset assemble
@@ -320,106 +333,125 @@
 ;; push down VectorReduce
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; ;; TODO: decompose remove-innermost-bc into pull-out-bc rule and match rule
-; (relation remove-innermost-bc-demand (Expr))
-; (relation remove-innermost-bc (
-;     ;; original
-;     Expr
-;     ;; removed
-;     Expr
-;     ))
+;; TODO: decompose remove-innermost-bc into pull-out-bc rule and match rule
+(relation remove-innermost-bc-demand (Expr))
+(relation remove-innermost-bc (
+    ;; original
+    Expr
+    ;; removed
+    Expr
+    ;; multiplicity shrinked
+    i64
+    ))
 
-; (rule (
-;     (VectorReduce ty (Add) (Bop (Mul) a b))
-; ) (
-;     ;; We only do right child because of commutativity
-;     (remove-innermost-bc-demand b)
-; ) :ruleset canonicalize)
+(rule (
+    (VectorReduce ty (Add) (Bop (Mul) a b))
+) (
+    ;; We only do right child because of commutativity
+    (remove-innermost-bc-demand b)
+) :ruleset push-down-vector-reduce)
 
-; (rule (
-;     (= e (VectorReduce ty (Add)
-;         (Bop (Mul) a b)
-;     ))
+(rule (
+    (= e (VectorReduce ty (Add)
+        (Bop (Mul) a b)
+    ))
 
-;     (remove-innermost-bc b shrinked-b)
-;     (has-type shirnked-b arg-type)
-; ) (
-;     (union e (VectorReduce ty (Add)
-;         (Bop (Mul) 
-;             (VectorReduce arg-type (Add) a)
-;             shrinked-b
-;             )))
-; ) :ruleset canonicalize)
+    (remove-innermost-bc b shrinked-b m)
+    (has-type shrinked-b arg-type)
+) (
+    ;; Subsuming the top level of the original lhs:
+    ;; There are likely no accelerable pattern where 
+    ;; the innermost expression is a broadcast
+    (subsume (VectorReduce ty (Add) (Bop (Mul) a b)))
+    (union e (VectorReduce ty (Add)
+        (Bop (Mul) 
+            (VectorReduce arg-type (Add) a)
+            shrinked-b
+            )))
+) :ruleset push-down-vector-reduce)
 
-; ;; Going down
+;; Going down
 
-; (rule (
-;     (remove-innermost-bc-demand (Cast ty e))
-; ) (
-;     (remove-innermost-bc-demand e)
-; ) :ruleset canonicalize)
+(rule (
+    (remove-innermost-bc-demand (Cast ty e))
+) (
+    (remove-innermost-bc-demand e)
+) :ruleset push-down-vector-reduce)
 
-; (rule (
-;     (remove-innermost-bc-demand (Load ty x e))
-; ) (
-;     (remove-innermost-bc-demand e)
-; ) :ruleset canonicalize)
+(rule (
+    (remove-innermost-bc-demand (Load ty x e))
+) (
+    (remove-innermost-bc-demand e)
+) :ruleset push-down-vector-reduce)
 
-; (rule (
-;     (remove-innermost-bc-demand (Ramp e s l))
-; ) (
-;     (remove-innermost-bc-demand e)
-; ) :ruleset canonicalize)
+(rule (
+    (remove-innermost-bc-demand (Ramp e s l))
+    (!= l 1)
+) (
+    (remove-innermost-bc-demand e)
+) :ruleset push-down-vector-reduce)
 
-; (rule (
-;     (remove-innermost-bc-demand (Broadcast e l))
-;     (has-type e ty)
-;     (> (LanesInType ty) 1)
-; ) (
-;     (remove-innermost-bc-demand e)
-; ) :ruleset canonicalize)
+(rule (
+    (remove-innermost-bc-demand (Broadcast e l))
+    (has-type e ty)
+    (> (LanesInType ty) 1)
+) (
+    (remove-innermost-bc-demand e)
+) :ruleset push-down-vector-reduce)
 
-; (rule (
-;     (remove-innermost-bc-demand (Broadcast e l))
-;     (has-type e ty)
-;     (= (LanesInType ty) 1)
-; ) (
-;     (remove-innermost-bc (Broadcast e l) e)
-; ) :ruleset canonicalize)
+(rule (
+    (remove-innermost-bc-demand (Broadcast e l))
+    (has-type e ty)
+    (= (LanesInType ty) 1)
+    (!= l 1)
+) (
+    (remove-innermost-bc (Broadcast e l) e l)
+) :ruleset push-down-vector-reduce)
 
-; ;; Going back up
+;; Going back up
 
-; (rule (
-;     (remove-innermost-bc-demand e)
-;     (= e (Cast ty e1))
-;     (remove-innermost-bc e1 removed)
-; ) (
-;     (remove-innermost-bc e (Cast ty removed))
-; ) :ruleset canonicalize)
+(rule (
+    (remove-innermost-bc-demand e)
+    (= e (Cast ty e1))
+    (remove-innermost-bc e1 removed m)
 
-; (rule (
-;     (remove-innermost-bc-demand e)
-;     (= e (Load ty x e1))
-;     (remove-innermost-bc e1 removed)
-; ) (
-;     (remove-innermost-bc e (Load ty x removed))
-; ) :ruleset canonicalize)
+    (= l (LanesInType ty))
+    (= (% l m) 0)
+) (
+    (remove-innermost-bc e (Cast (WithLanes ty (/ l m)) removed) m)
+) :ruleset push-down-vector-reduce)
 
-; (rule (
-;     (remove-innermost-bc-demand e)
-;     (= e (Broadcast e1 l))
-;     (remove-innermost-bc e1 removed)
-; ) (
-;     (remove-innermost-bc e (Broadcast removed l))
-; ) :ruleset canonicalize)
+(rule (
+    (remove-innermost-bc-demand e)
+    (= e (Load ty x e1))
+    (remove-innermost-bc e1 removed m)
 
-; (rule (
-;     (remove-innermost-bc-demand e)
-;     (= e (Ramp e1 s l))
-;     (remove-innermost-bc e1 removed)
-; ) (
-;     (remove-innermost-bc e (Ramp removed s l))
-; ) :ruleset canonicalize)
+    (= l (LanesInType ty))
+    (= (% l m) 0)
+) (
+    (remove-innermost-bc e (Load (WithLanes ty (/ l m)) x removed) m)
+) :ruleset push-down-vector-reduce)
+
+(rule (
+    (remove-innermost-bc-demand e)
+    (= e (Broadcast e1 l))
+    (remove-innermost-bc e1 removed m)
+
+    (!= l 1)
+) (
+    (remove-innermost-bc e (Broadcast removed l) m)
+) :ruleset push-down-vector-reduce)
+
+(rule (
+    (remove-innermost-bc-demand e)
+    (= e (Ramp e1 (Broadcast s ml) l))
+    (remove-innermost-bc e1 removed m)
+
+    (!= l 1)
+    (= (% ml m) 0)
+) (
+    (remove-innermost-bc e (Ramp removed (Broadcast s (/ ml l)) l) m)
+) :ruleset push-down-vector-reduce)
 
 
 ; )***"; prog += "\n";

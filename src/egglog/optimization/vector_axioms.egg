@@ -2,6 +2,18 @@
 ; prog +=  R"***(
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; !!Dangerous!!
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(rewrite
+    (VectorReduce t-outer bop (Cast t-inner e))
+    (Cast t-outer (VectorReduce (WithLanes t-e l-outer) bop e))
+  :when (
+    (has-type e t-e) 
+    (= l-outer (LanesInType t-outer))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Axiomatic rewrites
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -32,6 +44,7 @@
 
 ;; broadcast related axioms
 ;; TODO: these rules are still not replaceable, why??
+;; TODO: missing the cast-broadcastper rule for the degenerate rules
 (rewrite (Broadcast x 1) x)
 (rewrite (Broadcast (Load type name index) lanes) 
          (Load (MultipliedLanes type lanes) name (Broadcast index lanes)))
@@ -43,7 +56,53 @@
          (Load (MultipliedLanes type lanes) name (BroadcastPer p index lanes)))
 (rewrite (BroadcastPer p (Cast type expr) lanes) 
          (Cast (MultipliedLanes type lanes) (BroadcastPer p expr lanes)))
+(rewrite (Cast type (BroadcastPer p x l))
+         (BroadcastPer p (Cast (WithLanes type lx) x) l)
+    :when ((has-type x t)
+           (= (LanesInType t) lx)))
 
+;; Reverse the pulled out BroadcastPer
+;; TODO: in its own ruleset
+(rewrite (BroadcastPer p (Broadcast x l0) l1)
+         (Broadcast (BroadcastPer p x l1) l0)
+    :when ((has-type x t)
+           (= curr-p (LanesInType t))
+           (>= curr-p p)))
+(rewrite (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1)
+         (Ramp (BroadcastPer p x l1) (Broadcast s (* curr-p l1)) l0)
+    :when ((has-type x t)
+           (= curr-p (LanesInType t))
+           (>= curr-p p)))
+;; in the case the larger broadcast cannot be compressed
+;; this seems to be "confluent" with even considering multiple variants in the E-class,
+;; because this same rule can be achieved by running other rules on an equivalent version of the expression
+;; (that unnests the inner Broadcast to two Broadcasts)
+(rewrite (BroadcastPer p (Broadcast x l0) l1)
+         (Broadcast x (* l0 l1))
+    :when ((has-type x t)
+           (= curr-p (LanesInType t))
+           (< curr-p p)
+           (> (* curr-p l0) p)))
+(rewrite (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1)
+         (Ramp 
+            (Broadcast 
+                (Ramp 
+                    x 
+                    ; TODO: need to make sure all the lanes of the stride of the Ramp 
+                    ; must be the lanes of the type of `x`
+                    (Broadcast s curr-p) 
+                    (/ p curr-p))
+                l1)
+            (Broadcast (Bop (Mul) s (UIntOrIntImm signed bits (/ p curr-p))) (* p l1))
+            (/ l0 (/ p curr-p)))
+    :when ((has-type x (UIntOrInt signed bits curr-p))
+           (< curr-p p)
+           (> (* curr-p l0) p)
+           (= 0 (% p curr-p))
+           (= 0 (% l0 (/ p curr-p)))
+           ))
+
+;; More broadcast axioms
 (rewrite (Bop bop (Broadcast a l1) (Broadcast b l2))
          (Broadcast (Bop bop (Broadcast a (/ l1 l2)) b) l2)
     :when ((> l1 l2)

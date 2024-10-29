@@ -3,34 +3,76 @@
 (ruleset keep-best)
 (rule () ((keep-best __INPUTS__)) :ruleset keep-best)
 
-(run-schedule (repeat 18 (saturate (run typechecking)) (run )))
+(run-schedule 
+    (repeat 10
+        (saturate (run typechecking))
+        (run)))
+(run-schedule (saturate 
+    (saturate (run typechecking))
+    (run push-down-vector-reduce)))
+; (run-schedule 
+;     (repeat 10
+;         (saturate (run typechecking))
+;         (run)))
+; (keep-best __INPUTS__)
+
+(run-schedule (repeat 10 (saturate (run typechecking)) (run )))
 (keep-best __INPUTS__)
-(run-schedule (repeat 10 (run typechecking)))
-(run-schedule (repeat 3 (run)))
-(run-schedule (repeat 10 (run typechecking)))
-(run-schedule (repeat 20 (run canonicalize)))
+; (extract collectstoresplaceholdermatmulBBBeqsatBBB1)
 
+(run-schedule (repeat 15
+    (saturate (run typechecking))
+    (repeat 1 (run))
+    ))
+(run-schedule (repeat 20
+    (saturate (run typechecking))
+    (repeat 1 (run canonicalize))
+    ))
+(run-schedule (saturate
+    (saturate (run typechecking))
+    (repeat 1 (run assemble))
+    ))
+(run-schedule (repeat 10
+    (saturate (run typechecking))
+    (repeat 1 (run))
+    ))
+; (keep-best __INPUTS__)
 
-(run-schedule (repeat 10 (run typechecking)))
-(run-schedule (repeat 20 (run canonicalize)))
-(run-schedule (repeat 20 (run assemble)))
-(run-schedule (repeat 5 (run)))
+(run-schedule (repeat 10
+    (saturate (run typechecking))
+    (repeat 1 (run))
+    ))
 
-(keep-best __INPUTS__)
+; (keep-best __INPUTS__)
 
-; (ruleset debug)
-; (rule ((= a 
-; (Mem2AMX (BroadcastPer p (VectorReduce (Float 32 128) (Add) (Bop (Mul) 
-;     (Cast (Float 32 512) (Load (BFloat 16 512) (V "A") idxa))
-;     (Cast (Float 32 512) (Load (BFloat 16 512) (V "B") idxb)))) b)
-; ))
-; (!= b 1)
-; ) (
-;     (extract "idxa")
-;     (extract idxa) 
-;     (extract "idxb")
-;     (extract idxb)) :ruleset debug)
+; (run-schedule (repeat 14
+;     (saturate (run typechecking))
+;     (repeat 1 (run))
+;     ))
 
-; (run-schedule (run debug))
+(ruleset debug)
+(rule ((= e
+    (Store "matmul" 
+        (Mem2AMX (Bop (Add) (VectorReduce (Float 32 32) (Add) (Bop (Mul) 
+        (Cast (Float 32 128) (Load (BFloat 16 128) var 
+            index))
 
+        (Cast (Float 32 128) (Load (BFloat 16 128) (V "C") 
+            index2)) 
+        )) (AMX2Mem (Load (Float 32 32) (V "matmul") (Ramp (IntImm32 0) (IntImm32 1) 32))))) 
+    (Ramp (IntImm32 0) (IntImm32 1) 32))
+)
+) (
+    (extract "debugging...")
+    (extract var)
+    (extract index)
+    (extract index2)
+) :ruleset debug)
+
+(extract "")
+(run-schedule (run debug))
+
+(extract "")
+; (print-function amx-float-rhs 100)
+; (print-function amx-float-lhs 100)
 ; )***"; prog += "\n";

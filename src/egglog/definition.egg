@@ -106,15 +106,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (function Loc2Loc (Loc Loc Expr) Expr :unextractable)
 ; (function Mem2AMX (Expr) Expr :unextractable)
-(function Mem2AMX (Expr) Expr :cost 1000000000)
+(function Mem2AMX (Expr) Expr :cost 1)
 ; (function AMX2Mem (Expr) Expr :unextractable)
-(function AMX2Mem (Expr) Expr :cost 1000000000)
+(function AMX2Mem (Expr) Expr :cost 1)
 (birewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))
 (birewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))
 
 (function ExprVar (Loc Expr) Variable)
 ;; See `optimization/vector_axioms.egg` for conversion between `Broadcast` and `BroadcastPer`
-(function BroadcastPer (i64 Expr i64) Expr :cost 30000) ;; cost 200 to prioritize `Broadcast` over `BroadcastPer`
+(function BroadcastPer (i64 Expr i64) Expr :cost 200) ;; cost 200 to prioritize `Broadcast` over `BroadcastPer`
 
 ;; list of intrinsics
 ; KWayInterleave(i64 k, Expr base, i64 lanes): i64x(height*width)
@@ -169,6 +169,7 @@
 (ruleset canonicalize)
 (ruleset assemble)
 (ruleset typechecking)
+(ruleset push-down-vector-reduce)
 
 ; )***"; prog += "\n";
 

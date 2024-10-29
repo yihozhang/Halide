@@ -5,18 +5,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (relation CommBop (BinOp))
-(CommBop (Add))
-(CommBop (Mul))
-(CommBop (And))
-(CommBop (Or))
-(CommBop (Min))
-(CommBop (Max))
-(CommBop (EQ))
-(CommBop (NE))
+(rule () (
+    (CommBop (Add))
+    (CommBop (Mul))
+    (CommBop (And))
+    (CommBop (Or))
+    (CommBop (Min))
+    (CommBop (Max))
+    (CommBop (EQ))
+    (CommBop (NE))
+))
 
 (relation AddOrSub (BinOp))
-(AddOrSub (Add))
-(AddOrSub (Sub))
+(rule () (
+    (AddOrSub (Add))
+    (AddOrSub (Sub))
+))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Analysis rules

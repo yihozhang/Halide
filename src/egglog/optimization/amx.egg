@@ -329,11 +329,14 @@
     (let initial (Call "tile_zero" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)))))
     (let new-e (Call "tile_matmul" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) initial new-lhs new-rhs)))
     (AMXShape new-e x-lanes (* y-lanes 4))
+
     (union e (AMX2Mem new-e))
 ))
 
 (rewrite (Mem2AMX (AMX2Mem e)) e)
 (rewrite (AMX2Mem (Mem2AMX e)) e)
+(birewrite (Cast ty (AMX2Mem e)) (AMX2Mem (Cast ty e)))
+(birewrite (Cast ty (Mem2AMX e)) (Mem2AMX (Cast ty e)))
 (birewrite (BroadcastPer p (Mem2AMX e) l) (Mem2AMX (BroadcastPer p e l)))
 (birewrite (AMX2Mem (BroadcastPer p e l)) (BroadcastPer p (AMX2Mem e) l))
 
@@ -449,6 +452,10 @@
 
 ;; (rewrite (AMX2Mem value) (Load ty (ExprVar (AMX) value) (Computed))
 ;;     :when ((has-type value ty)))
+(rule ((= e (AMX2Mem value))
+       (has-type value ty)
+       (= extent (LanesInType ty)))
+      ((union e (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)))))
 (rewrite (AMX2Mem value) 
          (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent))
     :when (

@@ -20,6 +20,13 @@
 (rule ((= t (Handle l)))
       ((set (LanesInType t) l)) :ruleset typechecking)
 
+(function WithLanes (Type i64) Type)
+(rewrite (WithLanes (Int i l) x) (Int i x) :ruleset typechecking)
+(rewrite (WithLanes (UInt i l) x) (UInt i x) :ruleset typechecking)
+(rewrite (WithLanes (Float i l) x) (Float i x) :ruleset typechecking)
+(rewrite (WithLanes (BFloat i l) x) (BFloat i x) :ruleset typechecking)
+(rewrite (WithLanes (Handle l) x) (Handle x) :ruleset typechecking)
+
 (relation has-type (Expr Type))
 (rule ((= e (Cast ty Expr))) ((has-type e ty)) :ruleset typechecking)
 (rule ((= e (Reinterpret ty Expr))) ((has-type e ty)) :ruleset typechecking)
@@ -69,4 +76,7 @@
 ) (
     (has-type e (MultipliedLanes t l))
 ) :ruleset typechecking)
+
+(rule ((has-type e t1) (has-type e t2) (!= t1 t2)) ((extract e) (extract t1) (extract t2) (panic "?")))
+
 ; )***"; prog += "\n";
