@@ -119,9 +119,6 @@
     i64 ;; multiplicity
     Expr 
     InvertedIndex) Expr :unextractable)
-; (rule ((= root (assemble-inv-ind m e (InvertedIndexEnd))))
-; ((union root e)
-; (extract e)) :ruleset assemble)
 (rewrite (assemble-inv-ind m e (InvertedIndexEnd)) e 
     :ruleset assemble)
 (rewrite (assemble-inv-ind m e (InvRamp i (Broadcast s sl) l)) 

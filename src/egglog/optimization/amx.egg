@@ -456,6 +456,9 @@
        (has-type value ty)
        (= extent (LanesInType ty)))
       ((union e (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)))))
+;; there are some problems here
+;; ExprVar at least need to know the matrix dimension of `value`
+;; to properly codegen.
 (rewrite (AMX2Mem value) 
          (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent))
     :when (

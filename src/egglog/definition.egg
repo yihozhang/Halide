@@ -106,9 +106,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (function Loc2Loc (Loc Loc Expr) Expr :unextractable)
 ; (function Mem2AMX (Expr) Expr :unextractable)
-(function Mem2AMX (Expr) Expr :cost 1)
+(function Mem2AMX (Expr) Expr :cost 100)
 ; (function AMX2Mem (Expr) Expr :unextractable)
-(function AMX2Mem (Expr) Expr :cost 1)
+(function AMX2Mem (Expr) Expr :cost 100)
 (birewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))
 (birewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))
 

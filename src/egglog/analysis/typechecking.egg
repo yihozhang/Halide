@@ -77,6 +77,6 @@
     (has-type e (MultipliedLanes t l))
 ) :ruleset typechecking)
 
-(rule ((has-type e t1) (has-type e t2) (!= t1 t2)) ((extract e) (extract t1) (extract t2) (panic "?")))
+(rule ((has-type e t1) (has-type e t2) (!= t1 t2)) ((extract e) (extract t1) (extract t2) (panic "type error")))
 
 ; )***"; prog += "\n";
