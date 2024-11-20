@@ -109,6 +109,7 @@ tests(GROUPS error
       tiled_matmul_wrong_pattern.cpp
       tiled_matmul_wrong_tiling.cpp
       too_many_args.cpp
+      treat_rvar_as_var.cpp
       tuple_arg_select_undef.cpp
       tuple_output_bounds_check.cpp
       tuple_realization_to_buffer.cpp
