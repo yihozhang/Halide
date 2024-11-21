@@ -78,10 +78,7 @@ struct StringVar : public Var {
 };
 
 struct ExprVar : public Var {
-    enum Location {
-        Mem,
-        AMX
-    } loc;
+    Location loc;
     Expr expr;
     ExprVar(Location loc, Expr expr)
         : loc(loc), expr(std::move(expr)) {

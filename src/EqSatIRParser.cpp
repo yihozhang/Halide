@@ -139,11 +139,11 @@ std::shared_ptr<Var> EqSatIRParser::parse_var() {
         std::string name = parse_str();
         result = std::make_shared<StringVar>(name);
     } else if (is_head("ExprVar")) {
-        ExprVar::Location loc;
+        Location loc;
         if (is_head("(Mem)")) {
-            loc = ExprVar::Location::Mem;
+            loc = Location::Mem;
         } else if (is_head("(AMX)")) {
-            loc = ExprVar::Location::AMX;
+            loc = Location::AMX;
         } else {
             internal_error << "Unknown location at " << std::to_string(curr);
         }

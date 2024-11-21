@@ -170,12 +170,19 @@ void EqSatIRPrinter::visit(const VectorReduce *e) {
     printArgs(stream, "VectorReduce", TYPE_ARG(e->type), "(Add)", EXPR_ARG(e->value));
 }
 
-void EqSatIRPrinter::visit(const EqSatExtensions::MemToAMX *e) {
-    printArgs(stream, "Mem2AMX", EXPR_ARG(e->expr));
+std::string string_from_loc(EqSatExtensions::Location loc) {
+    switch (loc) {
+    case EqSatExtensions::Location::Mem:
+        return "(Mem)";
+    case EqSatExtensions::Location::AMX:
+        return "(AMX)";
+    case EqSatExtensions::Location::WMMA:
+        return "(WMMA)";
+    }
 }
 
-void EqSatIRPrinter::visit(const EqSatExtensions::AMXToMem *e) {
-    printArgs(stream, "AMX2Mem", EXPR_ARG(e->expr));
+void EqSatIRPrinter::visit(const EqSatExtensions::LocToLoc *e) {
+    printArgs(stream, "Loc2Loc", string_from_loc(e->from), string_from_loc(e->to), EXPR_ARG(e->expr));
 }
 
 void EqSatIRPrinter::visit(const Store *e) {

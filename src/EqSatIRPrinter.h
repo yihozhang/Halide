@@ -56,8 +56,7 @@ protected:
     void visit(const Call *) override;
     void visit(const Let *) override;
     void visit(const VectorReduce *) override;
-    void visit(const EqSatExtensions::MemToAMX *) override;
-    void visit(const EqSatExtensions::AMXToMem *) override;
+    void visit(const EqSatExtensions::LocToLoc *) override;
     void visit(const EqSatExtensions::GLoad *) override {
         internal_error << "GLoad not supported\n";
     }

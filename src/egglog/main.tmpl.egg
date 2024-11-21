@@ -5,7 +5,7 @@
 (include "optimization/arithmetic_axioms.egg")
 (include "optimization/constant_folding.egg")
 (include "optimization/index_tweaking.egg")
-(include "optimization/amx.egg")
+(include "accelerator/amx.egg")
 
 (include "INPUT")
 
