@@ -14,25 +14,35 @@ namespace Halide {
 namespace Internal {
 
 namespace EqSatExtensions {
-struct MemToAMX : public ExprNode<MemToAMX> {
-    Expr expr;
-    static Expr make(Expr expr, Type type) {
-        MemToAMX *node = new MemToAMX;
-        node->expr = expr;
-        node->type = type;
-        return node;
-    }
-    // This should not matter because MemToAMX is inserted only for the EqSat phase.
-    static const IRNodeType _node_type = IRNodeType::Call;
+
+enum class Location {
+    Mem,
+    AMX,
+    WMMA,
+
 };
 
-struct AMXToMem : public ExprNode<AMXToMem> {
+Location from_memory_type(MemoryType memtype);
+
+struct LocToLoc : public ExprNode<LocToLoc> {
+    Location from;
+    Location to;
     Expr expr;
-    static Expr make(Expr expr, Type type) {
-        AMXToMem *node = new AMXToMem;
-        node->expr = std::move(expr);
+    static Expr make(Expr expr, Type type, Location from, Location to) {
+        LocToLoc *node = new LocToLoc;
+        node->expr = expr;
         node->type = type;
+        node->from = from;
+        node->to = to; 
         return node;
+    }
+
+    static Expr MemToAMX(Expr expr, Type type) {
+        return make(expr, type, Location::Mem, Location::AMX);
+    }
+
+    static Expr AMXToMem(Expr expr, Type type) {
+        return make(expr, type, Location::AMX, Location::Mem);
     }
     // This should not matter because MemToAMX is inserted only for the EqSat phase.
     static const IRNodeType _node_type = IRNodeType::Call;
@@ -112,10 +122,7 @@ struct GVariable : public ExprNode<GVariable> {
 class EqSatIRVisitor : public IRVisitor {
 public:
     using IRVisitor::visit;
-    virtual void visit(const MemToAMX *e) {
-        e->expr.accept(this);
-    }
-    virtual void visit(const AMXToMem *e) {
+    virtual void visit(const LocToLoc *e) {
         e->expr.accept(this);
     }
     virtual void visit(const GLoad *e) {
@@ -137,21 +144,12 @@ public:
     virtual bool is_base_ir_mutator() override {
         return false;
     }
-    virtual Expr visit(const MemToAMX *e) {
+    virtual Expr visit(const LocToLoc *e) {
         Expr value = mutate(e->expr);
         if (value.same_as(e->expr)) {
             return e;
         } else {
-            return MemToAMX::make(value, e->type);
-        }
-    }
-
-    virtual Expr visit(const AMXToMem *e) {
-        Expr value = mutate(e->expr);
-        if (value.same_as(e->expr)) {
-            return e;
-        } else {
-            return AMXToMem::make(value, e->type);
+            return LocToLoc::make(value, e->type, e->from, e->to);
         }
     }
 

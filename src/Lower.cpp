@@ -425,7 +425,7 @@ void lower_impl(const vector<Function> &output_funcs,
     s = lower_unsafe_promises(s, t);
     log("Lowering after lowering unsafe promises:", s);
 
-    if (t.has_feature(Target::AVX512_SapphireRapids)) {
+    if (t.has_feature(Target::AVX512_SapphireRapids) || t.get_cuda_capability_lower_bound() >= 70) {
         debug(1) << "Extracting tile operations...\n";
         s = eqsat_extract_tile_operations(s);
         log("Lowering after extracting tile operations:", s);

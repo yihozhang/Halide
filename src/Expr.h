@@ -390,6 +390,11 @@ enum class MemoryType {
     /** AMX Tile register for X86. Any data that would be used in an AMX matrix
      * multiplication must first be loaded into an AMX tile register. */
     AMXTile,
+
+    /** Registers for TensorCore's Warp-level Matrix Multiplication. */
+    WMMAMatrixA,
+    WMMAMatrixB,
+    WMMAAccumulator,
 };
 
 namespace Internal {

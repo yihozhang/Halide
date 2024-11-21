@@ -669,6 +669,16 @@ class ExtractTileOperations : public IRMutator {
 
 namespace EqSatExtensions {
 
+Location from_memory_type(MemoryType memtype) {
+    if (memtype == MemoryType::AMXTile) {
+        return Location::AMX;
+    } else if (memtype == MemoryType::WMMAAccumulator) {
+        return Location::WMMA;
+    } else {
+        return Location::Mem;
+    }
+}
+
 Expr GLoad::make(Type type, std::shared_ptr<Var> name, Expr index, Buffer<> image, Parameter param, Expr predicate, ModulusRemainder alignment) {
     internal_assert(predicate.defined()) << "Load with undefined predicate\n";
     internal_assert(index.defined()) << "Load of undefined\n";
@@ -693,6 +703,8 @@ Expr GVariable::make(Type type, std::shared_ptr<Var> name) {
     node->name = std::move(name);
     return node;
 }
+
+// Inserting LocToLoc nodes to represent the data movement between different memory types
 // The only case we need to insert an AMXToMem node is when we are loading to an AMX tile
 // The only case we need to insert a MemToAMX node is when we are storing to an AMX tile
 class AnnotateDataMovement : public IRMutator {
@@ -702,7 +714,7 @@ public:
     AnnotateDataMovement() = default;
 
 protected:
-    std::vector<string> amx_vars;
+    std::map<string, MemoryType> vars_memory_type;
 
     Stmt visit(const Allocate *op) override {
         if (op->memory_type == MemoryType::AMXTile) {
@@ -712,32 +724,39 @@ protected:
                 (op->type.is_int_or_uint() && op->type.bits() == 8) ||
                 (op->type.is_bfloat() && op->type.bits() == 16))
                 << "scheduled tile operations must yield 32-bit integers or 32-bit floats for output, 8-bit integers or 16-bit floats for input";
+            user_assert(vars_memory_type.find(op->name) == vars_memory_type.end()) << "Duplicate variable name: " << op->name;
 
-            std::vector<string> curr_amx_vars(this->amx_vars);
-            curr_amx_vars.push_back(op->name);
-            ScopedValue<vector<string>> old_amx_vars(amx_vars, std::move(curr_amx_vars));
+        } else if (op->memory_type == MemoryType::WMMAAccumulator) {
+            user_assert(op->type.is_float() && op->type.bits() == 32) << "currently only support float16xfloat16 to float32 for WMMA";
 
-            Stmt body = mutate(op->body);
-
-            return Allocate::make(op->name, op->type, MemoryType::AMXTile, op->extents, const_true(), body);
         } else {
             return IRMutator::visit(op);
         }
+    
+        std::map<string, MemoryType> curr_vars_memory_type(this->vars_memory_type);
+        curr_vars_memory_type[op->name] = op->memory_type;
+        ScopedValue<std::map<string, MemoryType>> old_amx_vars(vars_memory_type, std::move(curr_vars_memory_type));
+
+        Stmt body = mutate(op->body);
+
+        return Allocate::make(op->name, op->type, op->memory_type, op->extents, const_true(), body);
     }
 
     Expr visit(const Load *load) override {
-        if (std::find(amx_vars.begin(), amx_vars.end(), load->name) != amx_vars.end()) {
-            internal_assert(is_const_one(load->predicate)) << "Only constant predicate is supported in AMX";
-            return AMXToMem::make(load, load->type);
+        auto result = vars_memory_type.find(load->name);
+        if (result != vars_memory_type.end()) {
+            internal_assert(is_const_one(load->predicate)) << "Only constant predicate is supported in accelerator tiles";
+            return LocToLoc::make(load, load->type, from_memory_type(result->second), Location::Mem);
         } else {
             return load;
         }
     }
 
     Stmt visit(const Store *store) override {
-        if (std::find(amx_vars.begin(), amx_vars.end(), store->name) != amx_vars.end()) {
+        auto result = vars_memory_type.find(store->name);
+        if (result != vars_memory_type.end()) {
             // `Load` can only occur in store->value,
-            Expr value = MemToAMX::make(mutate(store->value), store->value.type());
+            Expr value = LocToLoc::make(mutate(store->value), store->value.type(), Location::Mem, from_memory_type(result->second));
             internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
             return Store::make(
                 store->name,
@@ -1116,18 +1135,11 @@ std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&bindin
 }
 
 template<>
-void ExprNode<EqSatExtensions::MemToAMX>::accept(IRVisitor *v) const {
+void ExprNode<EqSatExtensions::LocToLoc>::accept(IRVisitor *v) const {
     using namespace EqSatExtensions;
     EqSatIRVisitor *ev = (EqSatIRVisitor *) v;
-    internal_assert(!v->is_base_ir_visitor()) << "MemToAMX can only be visited by EqSatIRVisitor\n";
-    ev->visit((const MemToAMX *)this);
-}
-template<>
-void ExprNode<EqSatExtensions::AMXToMem>::accept(IRVisitor *v) const {
-    using namespace EqSatExtensions;
-    EqSatIRVisitor *ev = (EqSatIRVisitor *) v;
-    internal_assert(!v->is_base_ir_visitor()) << "AMXToMem can only be visited by EqSatIRVisitor\n";
-    ev->visit((const AMXToMem *)this);
+    internal_assert(!v->is_base_ir_visitor()) << "LocToLoc can only be visited by EqSatIRVisitor\n";
+    ev->visit((const LocToLoc *)this);
 }
 template<>
 void ExprNode<EqSatExtensions::GLoad>::accept(IRVisitor *v) const {
@@ -1153,19 +1165,11 @@ void ExprNode<EqSatExtensions::GVariable>::accept(IRVisitor *v) const {
 }
 
 template<>
-Expr ExprNode<EqSatExtensions::MemToAMX>::mutate_expr(IRMutator *v) const {
+Expr ExprNode<EqSatExtensions::LocToLoc>::mutate_expr(IRMutator *v) const {
     using namespace EqSatExtensions;
     EqSatIRMutator *ev = (EqSatIRMutator *) v;
-    internal_assert(!v->is_base_ir_mutator()) << "MemToAMX can only be mutated by EqSatIRMutator\n";
-    return ev->visit((const MemToAMX *)this);
-}
-
-template<>
-Expr ExprNode<EqSatExtensions::AMXToMem>::mutate_expr(IRMutator *v) const {
-    using namespace EqSatExtensions;
-    EqSatIRMutator *ev = (EqSatIRMutator *) v;
-    internal_assert(!v->is_base_ir_mutator()) << "AMXToMem can only be mutated by EqSatIRMutator\n";
-    return ev->visit((const AMXToMem *)this);
+    internal_assert(!v->is_base_ir_mutator()) << "LocToLoc can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const LocToLoc *)this);
 }
 
 template<>
