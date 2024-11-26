@@ -110,8 +110,13 @@
 (function Mem2AMX (Expr) Expr :cost 100)
 ; (function AMX2Mem (Expr) Expr :unextractable)
 (function AMX2Mem (Expr) Expr :cost 100)
+(function WMMA2AMX (Expr) Expr :cost 100)
+(function AMX2WMMA (Expr) Expr :cost 100)
+
 (birewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))
 (birewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))
+(birewrite (WMMA2AMX e) (Loc2Loc (WMMA) (AMX) e))
+(birewrite (AMX2WMMA e) (Loc2Loc (AMX) (WMMA) e))
 
 (function ExprVar (Loc Expr) Variable)
 ;; See `optimization/vector_axioms.egg` for conversion between `Broadcast` and `BroadcastPer`

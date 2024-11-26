@@ -1,0 +1,62 @@
+;; different from AMX, the last column denotes number of elements rather than colbytes
+(relation WMMAAllocation (String i64  i64))
+(relation WMMAShape (Expr i64  i64))
+
+(rule (
+    (= e (Bop (Add) 
+        (VectorReduce (Float 32 out-lanes) (Add) 
+            (Bop (Mul) 
+                (Cast (Float 32 tot-lanes) lhs)
+                (Cast (Float 32 tot-lanes) rhs))
+            )
+        mat))
+    (= out-lanes (* x-lanes y-lanes))
+    (= tot-lanes (* out-lanes r-lanes))
+
+    (= orig-lhs (Load (Float 16 tot-lanes) lhs-name lhs-index))
+    (= lhs-index
+        (Ramp (Broadcast (Ramp lhs-base (IntImm32 1) r-lanes) y-lanes) 
+              (Broadcast x-stride (* y-lanes r-lanes))
+              x-lanes)
+    )
+
+    (= orig-rhs (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index))
+    (= rhs-index
+        (Broadcast
+            (Ramp (Ramp rhs-base 
+                        rhs-r-stride
+                        r-lanes
+                        )
+                  (Broadcast (IntImm32 1) r-lanes)
+                  y-lanes
+            )
+            x-lanes
+        )
+    )
+
+    (= x-lanes 16)
+    (= y-lanes 16)
+    (= r-lanes 16)
+) (
+    (let new-lhs (Call "wmma.load.a.sync.aligned.row.m16n16k16.f16" (Float 16 256) (vec-of (Var (Handle 1) lhs-name) lhs-base x-stride)))
+    (let new-rhs (Call "wmma.load.b.sync.aligned.row.m16n16k16.f16" (Float 16 256) (vec-of (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+    ; What should new-mat be? We can't just generate a Mem2WMMA here because we can only generate a load.c instruction here.
+    (let new-mat (Mem2WMMA mat))
+    (let new-e (Call "wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32" (Float 16 256) (vec-of (IntImm16 r-lanes) initial new-lhs new-rhs)))
+    (WMMAShape new-e x-lanes y-lanes)
+
+    (union e (WMMA2Mem new-e))
+))
+
+
+(rule (
+    (= e (MEM2WMMA
+        (Broadcast
+            (FloatImm 32 0.0)
+            lanes
+        )))
+    (WMMAShape e rows cols)
+) (
+    (let new-e (Call "tile_zero" (Float 32 lanes) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
+    (union e new-e)
+))
