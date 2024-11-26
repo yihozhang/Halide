@@ -8,6 +8,7 @@ auto EGGLOG_PROG = [](std::vector<std::pair<std::string, std::string>>&& binding
 #include "optimization/constant_folding.egg"
 #include "optimization/index_tweaking.egg"
 #include "accelerator/amx.egg"
+#include "accelerator/cuda_wmma.egg"
     for (auto [name, src] : bindings) {
         prog += "(let " + name + " " + src + ")\n";
     }

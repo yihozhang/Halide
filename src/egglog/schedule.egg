@@ -32,24 +32,24 @@
 
 (ruleset subsume-invalid-exprs)
 
-(rule (
-    (AMX2Mem e)
-) (
-    (subsume (AMX2Mem e))
-) :ruleset subsume-invalid-exprs)
+; (rule (
+;     (AMX2Mem e)
+; ) (
+;     (subsume (AMX2Mem e))
+; ) :ruleset subsume-invalid-exprs)
 
-(rule (
-    (Mem2AMX e)
-) (
-    (subsume (Mem2AMX e))
-) :ruleset subsume-invalid-exprs)
+; (rule (
+;     (Mem2AMX e)
+; ) (
+;     (subsume (Mem2AMX e))
+; ) :ruleset subsume-invalid-exprs)
 
-(rule (
-    (Cast t1 e)
-    (= e (Call "tile_matmul" t2 args))
-) (
-    (subsume (Cast t1 e))
-) :ruleset subsume-invalid-exprs)
+; (rule (
+;     (Cast t1 e)
+;     (= e (Call "tile_matmul" t2 args))
+; ) (
+;     (subsume (Cast t1 e))
+; ) :ruleset subsume-invalid-exprs)
 
 ; (run-schedule (saturate subsume-invalid-exprs))
 

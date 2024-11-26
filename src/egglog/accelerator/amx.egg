@@ -333,8 +333,6 @@
     (union e (AMX2Mem new-e))
 ))
 
-(rewrite (Mem2AMX (AMX2Mem e)) e)
-(rewrite (AMX2Mem (Mem2AMX e)) e)
 (birewrite (Cast ty (AMX2Mem e)) (AMX2Mem (Cast ty e)))
 (birewrite (Cast ty (Mem2AMX e)) (Mem2AMX (Cast ty e)))
 (birewrite (BroadcastPer p (Mem2AMX e) l) (Mem2AMX (BroadcastPer p e l)))
