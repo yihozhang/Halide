@@ -3,6 +3,27 @@
 (relation WMMAShape (Expr i64  i64))
 
 (rule (
+    (WMMAAllocation name rows cols)
+    (= e (Var t (V name)))
+) (
+    (WMMAShape e rows cols)
+))
+(rule (
+    (WMMAShape e rows cols)
+    (Store name e index)
+) (
+    (WMMAAllocation name rows cols)
+))
+; TODO: this rule is wrong: it requires the index to be a linear scan instead of an arbitrary expression
+(rule (
+    (WMMAAllocation name rows cols)
+    (Store name e index)
+) (
+    (WMMAShape e rows cols)
+))
+
+
+(rule (
     (= e (Bop (Add) 
         (VectorReduce (Float 32 out-lanes) (Add) 
             (Bop (Mul) 
@@ -56,7 +77,29 @@
             lanes
         )))
     (WMMAShape e rows cols)
+    (= lanes (* rows cols))
+
+    (= rows 16)
+    (= cols 16)
 ) (
-    ; (let new-e (Call "tile_zero" (Float 32 lanes) (vec-of (IntImm16 rows) (IntImm16 cols))))
-    ; (union e new-e)
+    (let new-e (Call "wmma.load.c.sync.aligned.row.m16n16k16.f16" (Float 32 lanes) (vec-of (Var (Handle 1) (ExprVar (Mem) (Broadcast (FloatImm 32 0.0) 256))) (IntImm32 16))))
+    (union e new-e)
+))
+
+(rule (
+    (= s (Store store-name (WMMA2Mem tile) index))
+    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
+    (= bytes 4)
+    (has-type value ty)
+
+    (= m-lanes 16)
+    (= n-lanes 16)
+) (
+    (let new-s (Evaluate 
+        (Call "wmma.store.d.sync.aligned.row.m16n16k16.f32" (Int 32 1) 
+            (vec-of (Var (Handle 1) (V store-name))
+                    tile
+                    (Bop (Mul) n-stride (IntImm32 bytes))
+                    ))))
+    (union s new-s)
 ))

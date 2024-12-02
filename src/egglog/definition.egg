@@ -110,8 +110,8 @@
 (function Mem2AMX (Expr) Expr :cost 100000)
 ; (function AMX2Mem (Expr) Expr :unextractable)
 (function AMX2Mem (Expr) Expr :cost 100000)
-(function WMMA2Mem (Expr) Expr :cost 100)
-(function Mem2WMMA (Expr) Expr :cost 100)
+(function WMMA2Mem (Expr) Expr :cost 1000)
+(function Mem2WMMA (Expr) Expr :cost 1000)
 
 (birewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))
 (birewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))

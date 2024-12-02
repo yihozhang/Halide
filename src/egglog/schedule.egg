@@ -1,7 +1,7 @@
 ; prog +=  R"***(
 
 (ruleset keep-best)
-(rule () ((keep-best __INPUTS__ "AMXShape" "AMXAllocation" "CommBop" "AddOrSub")) :ruleset keep-best)
+(rule () ((keep-best __INPUTS__ "AMXShape" "AMXAllocation" "WMMAShape" "WMMAAllocation" "CommBop" "AddOrSub")) :ruleset keep-best)
 
 (run-schedule 
     (repeat 10
@@ -11,7 +11,7 @@
     (saturate (run typechecking))
     (run push-down-vector-reduce)))
 
-(keep-best __INPUTS__ "AMXShape" "AMXAllocation" "CommBop" "AddOrSub")
+(keep-best __INPUTS__ "AMXShape" "AMXAllocation" "WMMAShape" "WMMAAllocation" "CommBop" "AddOrSub")
 
 (run-schedule (repeat 15
     (saturate (run typechecking))
