@@ -28,19 +28,19 @@
     (= e (Var t (V name)))
 ) (
     (AMXShape e rows colbytes)
-))
+) :ruleset amx)
 (rule (
     (AMXShape e rows colbytes)
     (Store name e index)
 ) (
     (AMXAllocation name rows colbytes)
-))
+) :ruleset amx)
 (rule (
     (AMXAllocation name rows colbytes)
     (Store name e index)
 ) (
     (AMXShape e rows colbytes)
-))
+) :ruleset amx)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tile_matmul
@@ -74,7 +74,7 @@
 ) (
     (let new-lhs (Call "tile_load" (UIntOrInt lhs-signed 8 (* x-lanes r-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
     (amx-int/uint-lhs orig-lhs x-lanes y-lanes r-lanes new-lhs)
-))
+) :ruleset amx)
 
 (rule (
     (= orig-lhs (Load (BFloat 16 tot-lanes) lhs-name lhs-index))
@@ -86,7 +86,7 @@
 ) (
     (let new-lhs (Call "tile_load" (BFloat 16 (* x-lanes r-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
     (amx-float-lhs orig-lhs x-lanes y-lanes r-lanes new-lhs)
-))
+) :ruleset amx)
 
 ;; Abstract AMX right-hand side access patterns
 
@@ -124,7 +124,7 @@
 ) (
     (let amx-rhs (Call "tile_load" (UIntOrInt rhs-signed 8 (* r-lanes y-lanes)) (vec-of (IntImm16 (/ r-lanes 4)) (IntImm16 (* y-lanes 4)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
     (amx-int/uint-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
-))
+) :ruleset amx)
 
 (rule (
     (= orig-rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-index))
@@ -143,7 +143,7 @@
 ) (
     (let amx-rhs (Call "tile_load" (BFloat 16 (* r-lanes y-lanes)) (vec-of (IntImm16 (/ r-lanes 2)) (IntImm16 (* y-lanes 2)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
     (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
-))
+) :ruleset amx)
 
 (rule (
     (= orig-rhs-mem (AMX2Mem orig-rhs))
@@ -164,7 +164,7 @@
 ) (
     (let amx-rhs (Load (UIntOrInt rhs-signed 8 (* r-lanes y-lanes)) rhs-name (Ramp rhs-base (IntImm32 1) (* r-lanes y-lanes))))
     (amx-int/uint-rhs orig-rhs-mem x-lanes y-lanes r-lanes amx-rhs)
-))
+) :ruleset amx)
 
 
 (rule (
@@ -185,7 +185,7 @@
 ) (
     (let amx-rhs (Load (BFloat 16 (* r-lanes y-lanes)) rhs-name (Ramp rhs-base (IntImm32 1) (* r-lanes y-lanes))))
     (amx-float-rhs orig-rhs-mem x-lanes y-lanes r-lanes amx-rhs)
-))
+) :ruleset amx)
 
 
 (rule (
@@ -218,7 +218,7 @@
             (IntImm32 (* y-lanes 4))
             )))
     (amx-int/uint-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
-))
+) :ruleset amx)
 
 
 (rule (
@@ -251,7 +251,7 @@
             (IntImm32 (* y-lanes 2))
             )))
     (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs)
-))
+) :ruleset amx)
 
 
 ; Int8/UInt8
@@ -272,7 +272,7 @@
     (let new-e (Call "tile_matmul" (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) (Mem2AMX mat) new-lhs new-rhs)))
     (AMXShape new-e x-lanes (* y-lanes 4))
     (union e (AMX2Mem new-e))
-))
+) :ruleset amx)
 
 ;; Same rule, but does C = AxB instead of C = AxB+C
 (rule (
@@ -291,7 +291,7 @@
     (let new-e (Call "tile_matmul" (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) initial new-lhs new-rhs)))
     (AMXShape new-e x-lanes (* y-lanes 4))
     (union e (AMX2Mem new-e))
-))
+) :ruleset amx)
 
 ; Float16
 (rule (
@@ -311,7 +311,7 @@
     (let new-e (Call "tile_matmul" (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) (Mem2AMX mat) new-lhs new-rhs)))
     (AMXShape new-e x-lanes (* y-lanes 4))
     (union e (AMX2Mem new-e))
-))
+) :ruleset amx)
 
 (rule (
     (= e
@@ -331,12 +331,12 @@
     (AMXShape new-e x-lanes (* y-lanes 4))
 
     (union e (AMX2Mem new-e))
-))
+) :ruleset amx)
 
-(birewrite (Cast ty (AMX2Mem e)) (AMX2Mem (Cast ty e)))
-(birewrite (Cast ty (Mem2AMX e)) (Mem2AMX (Cast ty e)))
-(birewrite (BroadcastPer p (Mem2AMX e) l) (Mem2AMX (BroadcastPer p e l)))
-(birewrite (AMX2Mem (BroadcastPer p e l)) (BroadcastPer p (AMX2Mem e) l))
+(birewrite (Cast ty (AMX2Mem e)) (AMX2Mem (Cast ty e)) :ruleset amx)
+(birewrite (Cast ty (Mem2AMX e)) (Mem2AMX (Cast ty e)) :ruleset amx)
+(birewrite (BroadcastPer p (Mem2AMX e) l) (Mem2AMX (BroadcastPer p e l)) :ruleset amx)
+(birewrite (AMX2Mem (BroadcastPer p e l)) (BroadcastPer p (AMX2Mem e) l) :ruleset amx)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tilezero
@@ -352,7 +352,7 @@
 ) (
     (let new-e (Call "tile_zero" (Int 32 lanes) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
     (union e new-e)
-))
+) :ruleset amx)
 
 (rule (
     (= e (Mem2AMX
@@ -364,7 +364,7 @@
 ) (
     (let new-e (Call "tile_zero" (Float 32 lanes) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
     (union e new-e)
-))
+) :ruleset amx)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tile_load
@@ -395,7 +395,7 @@
                            (IntImm32 colbytes) ;; stride
                            )))
     (union e new-e)
-))
+) :ruleset amx)
 
 (rule (
     (= e (Mem2AMX value))
@@ -414,7 +414,7 @@
                            (IntImm32 colbytes) ;; stride
                            )))
     (union e new-e)
-))
+) :ruleset amx)
 
 ; The specialized case
 
@@ -426,7 +426,7 @@
 ) (
     (let new-e (Call "tile_load" ty (vec-of (IntImm16 n-lanes) (IntImm16 m-lanes) (Var (Handle 1) name) base n-stride)))
     (union e new-e)
-))
+) :ruleset amx)
 
 (rule (
     (= e (Mem2AMX
@@ -436,7 +436,7 @@
 ) (
     (let new-e (Call "tile_load" ty (vec-of (IntImm16 n-lanes) (IntImm16 (* m-lanes 2)) (Var (Handle 1) name) base n-stride)))
     (union e new-e)
-))
+) :ruleset amx)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tile_store
@@ -453,7 +453,8 @@
 (rule ((= e (AMX2Mem value))
        (has-type value ty)
        (= extent (LanesInType ty)))
-      ((union e (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)))))
+      ((union e (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent))))
+    :ruleset amx)
 ;; there are some problems here
 ;; ExprVar at least need to know the matrix dimension of `value`
 ;; to properly codegen.
@@ -462,9 +463,11 @@
     :when (
         (has-type value ty)
         (= extent (LanesInType ty))
-    ))
+    )
+    :ruleset amx)
 ; de-specialization
-(rewrite (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)) (AMX2Mem value))
+(rewrite (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)) (AMX2Mem value)
+    :ruleset amx)
 
 (rule (
     (= s (Store store-name (AMX2Mem tile) index))
@@ -482,6 +485,6 @@
                     tile
                     ))))
     (union s new-s)
-))
+) :ruleset amx)
 
 ; )***"; prog += "\n";

@@ -392,8 +392,6 @@ enum class MemoryType {
     AMXTile,
 
     /** Registers for TensorCore's Warp-level Matrix Multiplication. */
-    WMMAMatrixA,
-    WMMAMatrixB,
     WMMAAccumulator,
 };
 

@@ -472,7 +472,8 @@ private:
         user_assert(op->memory_type == MemoryType::Auto ||
                     op->memory_type == MemoryType::GPUShared ||
                     op->memory_type == MemoryType::GPUTexture ||
-                    op->memory_type == MemoryType::Heap)
+                    op->memory_type == MemoryType::Heap ||
+                    op->memory_type == MemoryType::WMMAAccumulator)
             << "Allocation " << op->name << " must live in shared or heap memory, "
             << "but is scheduled to live in " << op->memory_type << " memory.\n";
 

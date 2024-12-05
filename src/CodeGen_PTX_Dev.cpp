@@ -240,6 +240,11 @@ void CodeGen_PTX_Dev::init_module() {
         {"dp2a", UInt(32), "dp2a_u32_u32", {UInt(16, 4), UInt(8, 4), UInt(32)}},
         {"round", Float(32), "llvm.rint.f32", {Float(32)}},
         {"round", Float(64), "llvm.rint.f64", {Float(64)}},
+        {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Float(16, 256), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}},
+        {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Float(16, 256), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}},
+        {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 256), "llvm.nvvm.wmma.load.c.sync.aligned.row.m16n16k16.f32", {Handle(), Int(32), Int(32)}},
+        {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 256), "llvm.nvvm.wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", {Float(32, 256), Float(16, 256), Float(16, 256)}},
+        {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "llvm.nvvm.wmma.store.d.sync.aligned.row.m16n16k16.f32", {Handle(), Float(32, 256), Int(32)}},
     };
 
     for (auto &&i : ptx_intrins) {

@@ -214,7 +214,6 @@
     (= (Ramp e2+ s2 l) right)
     (!= l 1)
 ) (
-    (panic "remove-aligned-bc-impl: Ramp-Ramp case not supported")
     (remove-aligned-bc-impl origin modified e1+ e2+ 
         (InvRamp inv-left s1 l)
         (InvRamp inv-right s2 l))
