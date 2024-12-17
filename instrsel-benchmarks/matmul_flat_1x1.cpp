@@ -19,14 +19,14 @@ bool matmul_bf16(Halide::Target target) {
     RDom r(0, acc, "acc");
 
     Func mm("matmul");
-    mm(x, y) = cast<float>(0);
 
     if (target.has_feature(Target::AVX512_SapphireRapids)) {
         Func A("A");
         Func B("B");
         A(x, y) = cast<bfloat16_t>(A(x, y));
         B(x, y) = cast<bfloat16_t>(B(x, y));
-        
+
+        mm(x, y) = cast<float>(0);
         mm(x, y) += cast<float>(cast<float>(A(r.x, y))) * cast<float>(B(x, r.x));
         int tile_x = 16;
         int tile_y = 32;
@@ -67,41 +67,55 @@ bool matmul_bf16(Halide::Target target) {
         int tile_y = 16;
         int tile_r = 16;
 
-
         A(x, y) = cast<float16_t>(A_input(x, y));
         B(x, y) = cast<float16_t>(B_input(x, y));
 
         A.compute_root().gpu_tile(x, y, rxi, ryi, tile_x, tile_y);
         B.compute_root().gpu_tile(x, y, rxi, ryi, tile_x, tile_y);
 
-        mm(x, y) += cast<float>(cast<float>(A(r.x, y))) * cast<float>(B(x, r.x));
-
+        mm(x, y) = cast<float>(0);
+        mm(x, y) += cast<float>(A(r.x, y)) * cast<float>(B(x, r.x));
 
         mm.compute_at(mm.in(), x)
             .store_in(MemoryType::WMMAAccumulator)
             .update()
             .split(x, x, rxi, tile_x)
             .split(y, y, ryi, tile_y)
-            // .gpu_tile(x, y, rxi, ryi, tile_x, tile_y)
             .split(r.x, rro, rri, tile_r)
             .reorder({rri, rxi, ryi, rro, x, y})
             .atomic()
             .vectorize(rri)
             .vectorize(rxi)
             .vectorize(ryi)
-            // .gpu_blocks(x, y)
-            .gpu_threads(rro)
+            // .gpu_blocks(rro)
             ;
+
+        // vectorize these three variables, inject a
+        // gpu_lanes loop where the size is 1
+        // then we do the lowering in egglog, which will
+        // recognize this pattern (similar to AMX) and
+        // emit the tensor core intrinsics
+        // delete the gpu_lanes and generate
+        // a new gpu_lanes of size 32
+
+        // semantics: create a gpu_lane, vectorize everything
+        // .gpu_tensor_core(rxi, ryi, rri)
 
         Var ixi("ixi"), iyi("iyi");
         mm.compute_at(mm.in(), x)
-            .tile(x, y, ixi, iyi, tile_x, tile_y)
-            .vectorize(ixi)
-            .vectorize(iyi);
-        
-        Var mmxi("mmxi"), mmyi("mmyi");
+            .split(x, x, rxi, tile_x)
+            .split(y, y, ryi, tile_y)
+            .vectorize(rxi)
+            .vectorize(ryi);
+
+        Var mmxi("mmxi"),
+            mmyi("mmyi");
         mm.in()
-            .gpu_tile(x, y, mmxi, mmyi, tile_x, tile_y)
+            .split(x, x, mmxi, tile_x)
+            .split(y, y, mmyi, tile_y)
+            .gpu_blocks(x, y)
+            .reorder({mmxi, mmyi, x, y})
+            // .atomic()
             .vectorize(mmxi)
             .vectorize(mmyi);
     } else {
