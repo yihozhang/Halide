@@ -1,5 +1,6 @@
 #include "ExtractTileOperations.h"
 
+#include "CanonicalizeGPUVars.h"
 #include "EqSatIRParser.h"
 #include "EqSatIRPrinter.h"
 #include "IRMatch.h"
@@ -1010,7 +1011,7 @@ protected:
     bool in_wmma = false;
 
     Stmt visit(const Allocate *op) override {
-        if (op->memory_type == MemoryType::WMMAAccumulator) {;
+        if (op->memory_type == MemoryType::WMMAAccumulator) {
             internal_assert(op->type.lanes() == 1);
             internal_assert(op->extents.size() == 1);
             internal_assert(op->extents[0].as<IntImm>()->value % 32 == 0);
@@ -1025,7 +1026,7 @@ protected:
             return Allocate::make(op->name,
                                   op->type.with_lanes(lanes),
                                   MemoryType::WMMAAccumulator, op->extents, const_true(),
-                                  For::make("wmma_warp_idx", 0, 32, ForType::GPULane, Partition::Never, DeviceAPI::CUDA,
+                                  For::make("wmma_warp_idx" + gpu_thread_name(0), 0, 32, ForType::GPULane, Partition::Never, DeviceAPI::CUDA,
                                             body));
         } else {
             return IRMutator::visit(op);

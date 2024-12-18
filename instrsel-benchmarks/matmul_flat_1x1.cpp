@@ -1,6 +1,7 @@
 #include "Halide.h"
 #include "halide_benchmark.h"
 #include "halide_test_dirs.h"
+#include "matrix_generator.h"
 
 #include <iomanip>
 #include <iostream>
@@ -127,6 +128,25 @@ bool matmul_bf16(Halide::Target target) {
 
     result.compile_to_lowered_stmt("/tmp/matmul_flat_1x1.html", {A_input, B_input}, HTML, target);
 
+
+
+    // test
+    int row = 32;
+    int col = 32;
+    Buffer<float> a_buf(acc, row);
+    fill_buffer_flat(a_buf, row, acc);
+    A_input.set(a_buf);
+    
+    Buffer<float> b_buf(col, acc);
+    fill_buffer_flat(b_buf, acc, col);
+    B_input.set(b_buf);
+
+    Buffer<float> out(col, row);
+    auto time = Tools::benchmark(5, 5, [&]() {
+        result.realize(out, target);
+    });
+
+    std::cout << "Exec time: " << time << "\n";
     std::cout << "Success!\n";
     return true;
 }

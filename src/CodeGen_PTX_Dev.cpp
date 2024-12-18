@@ -227,6 +227,7 @@ void CodeGen_PTX_Dev::init_module() {
         Type ret_type;
         const char *intrin_name;
         vector<Type> arg_types;
+        bool access_memory;
     };
 
     Intrinsic ptx_intrins[] = {
@@ -240,16 +241,25 @@ void CodeGen_PTX_Dev::init_module() {
         {"dp2a", UInt(32), "dp2a_u32_u32", {UInt(16, 4), UInt(8, 4), UInt(32)}},
         {"round", Float(32), "llvm.rint.f32", {Float(32)}},
         {"round", Float(64), "llvm.rint.f64", {Float(64)}},
-        {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Float(16, 256), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}},
-        {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Float(16, 256), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}},
-        {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 256), "llvm.nvvm.wmma.load.c.sync.aligned.row.m16n16k16.f32", {Handle(), Int(32), Int(32)}},
-        {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 256), "llvm.nvvm.wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", {Float(32, 256), Float(16, 256), Float(16, 256)}},
-        {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "llvm.nvvm.wmma.store.d.sync.aligned.row.m16n16k16.f32", {Handle(), Float(32, 256), Int(32)}},
+        // {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Float(16, 8), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}, true},
+        // {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Float(16, 8), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}, true},
+        // {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 8), "llvm.nvvm.wmma.load.c.sync.aligned.row.m16n16k16.f32", {Handle(), Int(32), Int(32)}, true},
+        // {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 8), "llvm.nvvm.wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", {Float(32, 8), Float(16, 8), Float(16, 8)}, true},
+        // {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "llvm.nvvm.wmma.store.d.sync.aligned.row.m16n16k16.f32", {Handle(), Float(32, 8), Int(32)}, true},
+
+        {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Float(16, 8), "llvm.nvvm.wmma.m16n16k16.load.a.row.stride.f16", {Handle(), Int(32), Int(32)}, true},
+        {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Float(16, 8), "llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16", {Handle(), Int(32), Int(32)}, true},
+        {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 8), "llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32", {Handle(), Int(32), Int(32)}, true},
+        {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 8), "llvm.nvvm.wmma.m16n16k16.mma.row.row.f16.f16", {Float(32, 8), Float(16, 8), Float(16, 8)}, true},
+        {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32", {Handle(), Float(32, 8), Int(32)}, true},
+
     };
 
     for (auto &&i : ptx_intrins) {
         auto *fn = declare_intrin_overload(i.name, i.ret_type, i.intrin_name, std::move(i.arg_types));
-        function_does_not_access_memory(fn);
+        if (!i.access_memory) {
+            function_does_not_access_memory(fn);
+        }
         fn->addFnAttr(llvm::Attribute::NoUnwind);
     }
 }
@@ -271,6 +281,15 @@ void CodeGen_PTX_Dev::visit(const Call *op) {
         value = ConstantInt::get(i32_t, 0);
         return;
     }
+
+    // if 
+    //     {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Float(16, 256), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}},
+    //     {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Float(16, 256), "llvm.nvvm.wmma.load.a.sync.aligned.row.m16n16k16.f16", {Handle(), Int(32), Int(32)}},
+    //     {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 256), "llvm.nvvm.wmma.load.c.sync.aligned.row.m16n16k16.f32", {Handle(), Int(32), Int(32)}},
+    //     {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 256), "llvm.nvvm.wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", {Float(32, 256), Float(16, 256), Float(16, 256)}},
+    //     {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "llvm.nvvm.wmma.store.d.sync.aligned.row.m16n16k16.f32", {Handle(), Float(32, 256), Int(32)}},
+
+    // if (op->name == )
 
     // TODO: It would be better if CodeGen_LLVM could handle overloaded intrin calls by default.
     value = call_overloaded_intrin(op->type, op->name, op->args);
