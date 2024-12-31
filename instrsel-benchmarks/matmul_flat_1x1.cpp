@@ -146,6 +146,21 @@ bool matmul_bf16(Halide::Target target) {
         result.realize(out, target);
     });
 
+
+    // for (int j = 0; j < row; ++j) {
+    //     for (int i = 0; i < col; ++i) {
+    //         float val = 0;
+    //         for (int k = 0; k < acc; ++k) {
+    //             val += static_cast<int32_t>(a_buf(k, j)) * static_cast<int32_t>(b_buf(i, k));
+    //         }
+    //         if (fabs(val - out(i, j)) > 0.001) {
+    //             std::cerr << "Invalid result at " << i << ", " << j << "\n"
+    //                       << out(i, j) << " != " << val << "\n";
+    //             return false;
+    //         }
+    //     }
+    // }
+
     std::cout << "Exec time: " << time << "\n";
     std::cout << "Success!\n";
     return true;

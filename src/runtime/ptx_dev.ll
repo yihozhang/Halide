@@ -398,3 +398,215 @@ define weak_odr i32 @dp2a_u32_u32(<4 x i16> %a, <4 x i8> %b, i32 %i) nounwind re
        ret i32 %d
 }
 
+declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.load.a.row.stride.f16(i8* nocapture readonly, i32) 
+declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16(i8* nocapture readonly, i32)  
+declare { float, float, float, float, float, float, float, float } @llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32(i8* nocapture readonly, i32) 
+; declare { i32, i32, i32, i32} @llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f16.p0i32(i32* nocapture readonly , i32) 
+declare { float, float, float, float, float, float, float, float } @llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, float, float, float, float, float, float, float, float) nounwind readnone
+declare void @llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* nocapture writeonly, float, float, float, float, float, float, float, float, i32) 
+
+
+; declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.load.a.row.stride.f16.p0i32(i32* nocapture readonly, i32) 
+; declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16.p0i32(i32* nocapture readonly, i32)  
+; declare { float, float, float, float, float, float, float, float } @llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32.p0f32(float* nocapture readonly, i32) 
+; declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>} @llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f16.p0i32(i32* nocapture readonly , i32) 
+; declare { float, float, float, float, float, float, float, float } @llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, float, float, float, float, float, float, float, float) nounwind readnone
+
+define weak_odr <8 x i32> @adapted.llvm.nvvm.wmma.m16n16k16.load.a.row.stride.f16(i8* %ptr, i32 %offset, i32 %stride) nounwind readnone alwaysinline {
+  %start = getelementptr i8, i8* %ptr, i32 %offset
+  %result = tail call { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.load.a.row.stride.f16(i8* %start, i32 %stride)
+  %v0 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 0
+  %v1 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 1
+  %v2 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 2
+  %v3 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 3
+  %v4 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 4
+  %v5 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 5
+  %v6 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 6
+  %v7 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 7
+
+  %v0i32 = bitcast <2 x half> %v0 to i32
+  %v1i32 = bitcast <2 x half> %v1 to i32
+  %v2i32 = bitcast <2 x half> %v2 to i32
+  %v3i32 = bitcast <2 x half> %v3 to i32
+  %v4i32 = bitcast <2 x half> %v4 to i32
+  %v5i32 = bitcast <2 x half> %v5 to i32
+  %v6i32 = bitcast <2 x half> %v6 to i32
+  %v7i32 = bitcast <2 x half> %v7 to i32
+
+  %vec0 = insertelement <8 x i32> poison, i32 %v0i32, i32 0
+  %vec1 = insertelement <8 x i32> %vec0, i32 %v1i32, i32 1
+  %vec2 = insertelement <8 x i32> %vec1, i32 %v2i32, i32 2
+  %vec3 = insertelement <8 x i32> %vec2, i32 %v3i32, i32 3
+  %vec4 = insertelement <8 x i32> %vec3, i32 %v4i32, i32 4
+  %vec5 = insertelement <8 x i32> %vec4, i32 %v5i32, i32 5
+  %vec6 = insertelement <8 x i32> %vec5, i32 %v6i32, i32 6
+  %vec7 = insertelement <8 x i32> %vec6, i32 %v7i32, i32 7
+  ret <8 x i32> %vec7
+}
+
+define weak_odr <8 x i32> @adapted.llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16(i8* %ptr, i32 %offset, i32 %stride) nounwind readnone alwaysinline {
+  %start = getelementptr i8, i8* %ptr, i32 %offset
+  %result = tail call { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16(i8* %start, i32 %stride)
+  %v0 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 0
+  %v1 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 1
+  %v2 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 2
+  %v3 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 3
+  %v4 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 4
+  %v5 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 5
+  %v6 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 6
+  %v7 = extractvalue { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } %result, 7
+
+  %v0i32 = bitcast <2 x half> %v0 to i32
+  %v1i32 = bitcast <2 x half> %v1 to i32
+  %v2i32 = bitcast <2 x half> %v2 to i32
+  %v3i32 = bitcast <2 x half> %v3 to i32
+  %v4i32 = bitcast <2 x half> %v4 to i32
+  %v5i32 = bitcast <2 x half> %v5 to i32
+  %v6i32 = bitcast <2 x half> %v6 to i32
+  %v7i32 = bitcast <2 x half> %v7 to i32
+
+  %vec0 = insertelement <8 x i32> poison, i32 %v0i32, i32 0
+  %vec1 = insertelement <8 x i32> %vec0, i32 %v1i32, i32 1
+  %vec2 = insertelement <8 x i32> %vec1, i32 %v2i32, i32 2
+  %vec3 = insertelement <8 x i32> %vec2, i32 %v3i32, i32 3
+  %vec4 = insertelement <8 x i32> %vec3, i32 %v4i32, i32 4
+  %vec5 = insertelement <8 x i32> %vec4, i32 %v5i32, i32 5
+  %vec6 = insertelement <8 x i32> %vec5, i32 %v6i32, i32 6
+  %vec7 = insertelement <8 x i32> %vec6, i32 %v7i32, i32 7
+  ret <8 x i32> %vec7
+}
+
+define weak_odr <8 x float> @adapted.llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32(i8* %ptr, i32 %offset, i32 %stride) nounwind readnone alwaysinline {
+  %start = getelementptr i8, i8* %ptr, i32 %offset
+  %result = tail call {float, float, float, float, float, float, float, float} @llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32(i8* %start, i32 %stride)
+  %v0 = extractvalue {float, float, float, float, float, float, float, float} %result, 0
+  %v1 = extractvalue {float, float, float, float, float, float, float, float} %result, 1
+  %v2 = extractvalue {float, float, float, float, float, float, float, float} %result, 2
+  %v3 = extractvalue {float, float, float, float, float, float, float, float} %result, 3
+  %v4 = extractvalue {float, float, float, float, float, float, float, float} %result, 4
+  %v5 = extractvalue {float, float, float, float, float, float, float, float} %result, 5
+  %v6 = extractvalue {float, float, float, float, float, float, float, float} %result, 6
+  %v7 = extractvalue {float, float, float, float, float, float, float, float} %result, 7
+  %vec0 = insertelement <8 x float> poison, float %v0, i32 0
+       %vec1 = insertelement <8 x float> %vec0, float %v1, i32 1
+       %vec2 = insertelement <8 x float> %vec1, float %v2, i32 2
+       %vec3 = insertelement <8 x float> %vec2, float %v3, i32 3
+       %vec4 = insertelement <8 x float> %vec3, float %v4, i32 4
+       %vec5 = insertelement <8 x float> %vec4, float %v5, i32 5
+       %vec6 = insertelement <8 x float> %vec5, float %v6, i32 6
+       %vec7 = insertelement <8 x float> %vec6, float %v7, i32 7
+       ret <8 x float> %vec7
+}
+
+define weak_odr <8 x float> @adapted.llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<8 x i32> %a, <8 x i32> %b, <8 x float> %c) nounwind readnone alwaysinline {
+%a0 = extractelement <8 x i32> %a, i32 0
+%a1 = extractelement <8 x i32> %a, i32 1
+%a2 = extractelement <8 x i32> %a, i32 2
+%a3 = extractelement <8 x i32> %a, i32 3
+%a4 = extractelement <8 x i32> %a, i32 4
+%a5 = extractelement <8 x i32> %a, i32 5
+%a6 = extractelement <8 x i32> %a, i32 6
+%a7 = extractelement <8 x i32> %a, i32 7
+
+%a0half = bitcast i32 %a0 to <2 x half>
+%a1half = bitcast i32 %a1 to <2 x half>
+%a2half = bitcast i32 %a2 to <2 x half>
+%a3half = bitcast i32 %a3 to <2 x half>
+%a4half = bitcast i32 %a4 to <2 x half>
+%a5half = bitcast i32 %a5 to <2 x half>
+%a6half = bitcast i32 %a6 to <2 x half>
+%a7half = bitcast i32 %a7 to <2 x half>
+
+%b0 = extractelement <8 x i32> %b, i32 0
+%b1 = extractelement <8 x i32> %b, i32 1
+%b2 = extractelement <8 x i32> %b, i32 2
+%b3 = extractelement <8 x i32> %b, i32 3
+%b4 = extractelement <8 x i32> %b, i32 4
+%b5 = extractelement <8 x i32> %b, i32 5
+%b6 = extractelement <8 x i32> %b, i32 6
+%b7 = extractelement <8 x i32> %b, i32 7
+
+%b0half = bitcast i32 %b0 to <2 x half>
+%b1half = bitcast i32 %b1 to <2 x half>
+%b2half = bitcast i32 %b2 to <2 x half>
+%b3half = bitcast i32 %b3 to <2 x half>
+%b4half = bitcast i32 %b4 to <2 x half>
+%b5half = bitcast i32 %b5 to <2 x half>
+%b6half = bitcast i32 %b6 to <2 x half>
+%b7half = bitcast i32 %b7 to <2 x half>
+
+%c0 = extractelement <8 x float> %c, i32 0
+%c1 = extractelement <8 x float> %c, i32 1
+%c2 = extractelement <8 x float> %c, i32 2
+%c3 = extractelement <8 x float> %c, i32 3
+%c4 = extractelement <8 x float> %c, i32 4
+%c5 = extractelement <8 x float> %c, i32 5
+%c6 = extractelement <8 x float> %c, i32 6
+%c7 = extractelement <8 x float> %c, i32 7
+
+%result = call {float, float, float, float, float, float, float, float} @llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<2 x half> %a0half, <2 x half> %a1half, <2 x half> %a2half, <2 x half> %a3half, <2 x half> %a4half, <2 x half> %a5half, <2 x half> %a6half, <2 x half> %a7half, <2 x half> %b0half, <2 x half> %b1half, <2 x half> %b2half, <2 x half> %b3half, <2 x half> %b4half, <2 x half> %b5half, <2 x half> %b6half, <2 x half> %b7half, float %c0, float %c1, float %c2, float %c3, float %c4, float %c5, float %c6, float %c7)
+
+%v0 = extractvalue {float, float, float, float, float, float, float, float} %result, 0
+%v1 = extractvalue {float, float, float, float, float, float, float, float} %result, 1
+%v2 = extractvalue {float, float, float, float, float, float, float, float} %result, 2
+%v3 = extractvalue {float, float, float, float, float, float, float, float} %result, 3
+%v4 = extractvalue {float, float, float, float, float, float, float, float} %result, 4
+%v5 = extractvalue {float, float, float, float, float, float, float, float} %result, 5
+%v6 = extractvalue {float, float, float, float, float, float, float, float} %result, 6
+%v7 = extractvalue {float, float, float, float, float, float, float, float} %result, 7
+%vec0 = insertelement <8 x float> poison, float %v0, i32 0
+%vec1 = insertelement <8 x float> %vec0, float %v1, i32 1
+%vec2 = insertelement <8 x float> %vec1, float %v2, i32 2
+%vec3 = insertelement <8 x float> %vec2, float %v3, i32 3
+%vec4 = insertelement <8 x float> %vec3, float %v4, i32 4
+%vec5 = insertelement <8 x float> %vec4, float %v5, i32 5
+%vec6 = insertelement <8 x float> %vec5, float %v6, i32 6
+%vec7 = insertelement <8 x float> %vec6, float %v7, i32 7
+ret <8 x float> %vec7
+}
+
+define weak_odr i32 @adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* %ptr, <8 x float> %out, i32 %stride) nounwind readnone alwaysinline {
+  %v0 = extractelement <8 x float> %out, i32 0
+  %v1 = extractelement <8 x float> %out, i32 1
+  %v2 = extractelement <8 x float> %out, i32 2
+  %v3 = extractelement <8 x float> %out, i32 3
+  %v4 = extractelement <8 x float> %out, i32 4
+  %v5 = extractelement <8 x float> %out, i32 5
+  %v6 = extractelement <8 x float> %out, i32 6
+  %v7 = extractelement <8 x float> %out, i32 7 
+  call void @llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* %ptr, float %v0, float %v1, float %v2, float %v3, float %v4, float %v5, float %v6, float %v7, i32 %stride)
+  ret i32 0
+}
+
+
+
+
+; ; Function Attrs: nounwind readnone
+; declare { float, float, float, float, float, float, float, float } @llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, float, float, float, float, float, float, float, float) nounwind readnone
+
+
+
+
+; declare void @llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32.p0f32(float* nocapture writeonly, float, float, float, float, float, float, float, float, i32) 
+
+; declare void @llvm.nvvm.wmma.m16n16k16.store.d.row.f16.p0i32(i32* nocapture writeonly, <2 x half>, <2 x half>, <2 x half>, <2 x half>) 
+
+; ; Function Attrs: argmemonly nounwind writeonly
+; declare void @llvm.nvvm.wmma.m16n16k16.store.d.row.stride.s32.p0i32(i32* nocapture writeonly, i32, i32, i32, i32, i32, i32, i32, i32, i32)
+
+
+; ; Function Attrs: argmemonly nounwind readonly
+; declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.load.c.row.stride.s32.p0i32(i32* nocapture readonly, i32)
+
+; ; Function Attrs: argmemonly nounwind readonly
+; declare { i32, i32 } @llvm.nvvm.wmma.m16n16k16.load.a.row.stride.u8.p0i32(i32* nocapture readonly, i32)
+
+; ; Function Attrs: argmemonly nounwind readonly
+; declare { i32, i32 } @llvm.nvvm.wmma.m16n16k16.load.b.row.stride.u8.p0i32(i32* nocapture readonly, i32)
+; declare { i32, i32 } @llvm.nvvm.wmma.m16n16k16.load.b.col.stride.u8.p0i32(i32* nocapture readonly, i32)
+; ; Function Attrs: nounwind readnone
+; declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.mma.row.row.u8(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32)
+; declare { <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half>, <2 x half> } @llvm.nvvm.wmma.m16n16k16.mma.row.col.u8(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32)
+
+
+

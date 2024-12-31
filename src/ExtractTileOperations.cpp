@@ -999,12 +999,11 @@ class EnforceWMMALanes : public IRMutator {
     using IRMutator::visit;
 
     std::vector<string> tile_vars;
-    vector<string> intrinsic_names = {
-        "wmma.load.a.sync.aligned.row.m16n16k16.f16",
-        "wmma.load.b.sync.aligned.row.m16n16k16.f16",
-        "wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32",
-        "wmma.load.c.sync.aligned.row.m16n16k16.f32",
-        // "wmma.store.d.sync.aligned.row.m16n16k16.f32"
+    std::map<string, Type> intrinsic_types = {
+        {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Int(32, 8)},
+        {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Int(32, 8)},
+        {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 8)},
+        {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 8)},
     };
 
 protected:
@@ -1046,11 +1045,11 @@ protected:
     }
 
     Expr visit(const Call *op) override {
-        if (std::find(intrinsic_names.begin(), intrinsic_names.end(), op->name) != intrinsic_names.end()) {
+        if (intrinsic_types.count(op->name)) {
             internal_assert(in_wmma);
             internal_assert(op->type.lanes() % 32 == 0);
             return Call::make(
-                op->type.with_lanes(op->type.lanes() / 32),
+                intrinsic_types[op->name],
                 op->name,
                 mutate(op->args),
                 op->call_type,
