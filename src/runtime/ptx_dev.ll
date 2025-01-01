@@ -479,6 +479,75 @@ define weak_odr <8 x i32> @adapted.llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f1
 define weak_odr <8 x float> @adapted.llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32(i8* %ptr, i32 %offset, i32 %stride) nounwind readnone alwaysinline {
   %start = getelementptr i8, i8* %ptr, i32 %offset
   %result = tail call {float, float, float, float, float, float, float, float} @llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32(i8* %start, i32 %stride)
+
+  %v0 = extractvalue {float, float, float, float, float, float, float, float} %result, 0
+  %v1 = extractvalue {float, float, float, float, float, float, float, float} %result, 1
+  %v2 = extractvalue {float, float, float, float, float, float, float, float} %result, 2
+  %v3 = extractvalue {float, float, float, float, float, float, float, float} %result, 3
+  %v4 = extractvalue {float, float, float, float, float, float, float, float} %result, 4
+  %v5 = extractvalue {float, float, float, float, float, float, float, float} %result, 5
+  %v6 = extractvalue {float, float, float, float, float, float, float, float} %result, 6
+  %v7 = extractvalue {float, float, float, float, float, float, float, float} %result, 7
+
+  %vec0 = insertelement <8 x float> poison, float %v0, i32 0
+  %vec1 = insertelement <8 x float> %vec0, float %v1, i32 1
+  %vec2 = insertelement <8 x float> %vec1, float %v2, i32 2
+  %vec3 = insertelement <8 x float> %vec2, float %v3, i32 3
+  %vec4 = insertelement <8 x float> %vec3, float %v4, i32 4
+  %vec5 = insertelement <8 x float> %vec4, float %v5, i32 5
+  %vec6 = insertelement <8 x float> %vec5, float %v6, i32 6
+  %vec7 = insertelement <8 x float> %vec6, float %v7, i32 7
+  ret <8 x float> %vec7
+}
+
+define weak_odr <8 x float> @adapted.llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<8 x i32> %a, <8 x i32> %b, <8 x float> %c) nounwind readnone alwaysinline {
+  %a0 = extractelement <8 x i32> %a, i32 0
+  %a1 = extractelement <8 x i32> %a, i32 1
+  %a2 = extractelement <8 x i32> %a, i32 2
+  %a3 = extractelement <8 x i32> %a, i32 3
+  %a4 = extractelement <8 x i32> %a, i32 4
+  %a5 = extractelement <8 x i32> %a, i32 5
+  %a6 = extractelement <8 x i32> %a, i32 6
+  %a7 = extractelement <8 x i32> %a, i32 7
+
+  %a0half = bitcast i32 %a0 to <2 x half>
+  %a1half = bitcast i32 %a1 to <2 x half>
+  %a2half = bitcast i32 %a2 to <2 x half>
+  %a3half = bitcast i32 %a3 to <2 x half>
+  %a4half = bitcast i32 %a4 to <2 x half>
+  %a5half = bitcast i32 %a5 to <2 x half>
+  %a6half = bitcast i32 %a6 to <2 x half>
+  %a7half = bitcast i32 %a7 to <2 x half>
+
+  %b0 = extractelement <8 x i32> %b, i32 0
+  %b1 = extractelement <8 x i32> %b, i32 1
+  %b2 = extractelement <8 x i32> %b, i32 2
+  %b3 = extractelement <8 x i32> %b, i32 3
+  %b4 = extractelement <8 x i32> %b, i32 4
+  %b5 = extractelement <8 x i32> %b, i32 5
+  %b6 = extractelement <8 x i32> %b, i32 6
+  %b7 = extractelement <8 x i32> %b, i32 7
+
+  %b0half = bitcast i32 %b0 to <2 x half>
+  %b1half = bitcast i32 %b1 to <2 x half>
+  %b2half = bitcast i32 %b2 to <2 x half>
+  %b3half = bitcast i32 %b3 to <2 x half>
+  %b4half = bitcast i32 %b4 to <2 x half>
+  %b5half = bitcast i32 %b5 to <2 x half>
+  %b6half = bitcast i32 %b6 to <2 x half>
+  %b7half = bitcast i32 %b7 to <2 x half>
+
+  %c0 = extractelement <8 x float> %c, i32 0
+  %c1 = extractelement <8 x float> %c, i32 1
+  %c2 = extractelement <8 x float> %c, i32 2
+  %c3 = extractelement <8 x float> %c, i32 3
+  %c4 = extractelement <8 x float> %c, i32 4
+  %c5 = extractelement <8 x float> %c, i32 5
+  %c6 = extractelement <8 x float> %c, i32 6
+  %c7 = extractelement <8 x float> %c, i32 7
+
+  %result = call {float, float, float, float, float, float, float, float} @llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<2 x half> %a0half, <2 x half> %a1half, <2 x half> %a2half, <2 x half> %a3half, <2 x half> %a4half, <2 x half> %a5half, <2 x half> %a6half, <2 x half> %a7half, <2 x half> %b0half, <2 x half> %b1half, <2 x half> %b2half, <2 x half> %b3half, <2 x half> %b4half, <2 x half> %b5half, <2 x half> %b6half, <2 x half> %b7half, float %c0, float %c1, float %c2, float %c3, float %c4, float %c5, float %c6, float %c7)
+
   %v0 = extractvalue {float, float, float, float, float, float, float, float} %result, 0
   %v1 = extractvalue {float, float, float, float, float, float, float, float} %result, 1
   %v2 = extractvalue {float, float, float, float, float, float, float, float} %result, 2
@@ -488,81 +557,14 @@ define weak_odr <8 x float> @adapted.llvm.nvvm.wmma.m16n16k16.load.c.row.stride.
   %v6 = extractvalue {float, float, float, float, float, float, float, float} %result, 6
   %v7 = extractvalue {float, float, float, float, float, float, float, float} %result, 7
   %vec0 = insertelement <8 x float> poison, float %v0, i32 0
-       %vec1 = insertelement <8 x float> %vec0, float %v1, i32 1
-       %vec2 = insertelement <8 x float> %vec1, float %v2, i32 2
-       %vec3 = insertelement <8 x float> %vec2, float %v3, i32 3
-       %vec4 = insertelement <8 x float> %vec3, float %v4, i32 4
-       %vec5 = insertelement <8 x float> %vec4, float %v5, i32 5
-       %vec6 = insertelement <8 x float> %vec5, float %v6, i32 6
-       %vec7 = insertelement <8 x float> %vec6, float %v7, i32 7
-       ret <8 x float> %vec7
-}
-
-define weak_odr <8 x float> @adapted.llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<8 x i32> %a, <8 x i32> %b, <8 x float> %c) nounwind readnone alwaysinline {
-%a0 = extractelement <8 x i32> %a, i32 0
-%a1 = extractelement <8 x i32> %a, i32 1
-%a2 = extractelement <8 x i32> %a, i32 2
-%a3 = extractelement <8 x i32> %a, i32 3
-%a4 = extractelement <8 x i32> %a, i32 4
-%a5 = extractelement <8 x i32> %a, i32 5
-%a6 = extractelement <8 x i32> %a, i32 6
-%a7 = extractelement <8 x i32> %a, i32 7
-
-%a0half = bitcast i32 %a0 to <2 x half>
-%a1half = bitcast i32 %a1 to <2 x half>
-%a2half = bitcast i32 %a2 to <2 x half>
-%a3half = bitcast i32 %a3 to <2 x half>
-%a4half = bitcast i32 %a4 to <2 x half>
-%a5half = bitcast i32 %a5 to <2 x half>
-%a6half = bitcast i32 %a6 to <2 x half>
-%a7half = bitcast i32 %a7 to <2 x half>
-
-%b0 = extractelement <8 x i32> %b, i32 0
-%b1 = extractelement <8 x i32> %b, i32 1
-%b2 = extractelement <8 x i32> %b, i32 2
-%b3 = extractelement <8 x i32> %b, i32 3
-%b4 = extractelement <8 x i32> %b, i32 4
-%b5 = extractelement <8 x i32> %b, i32 5
-%b6 = extractelement <8 x i32> %b, i32 6
-%b7 = extractelement <8 x i32> %b, i32 7
-
-%b0half = bitcast i32 %b0 to <2 x half>
-%b1half = bitcast i32 %b1 to <2 x half>
-%b2half = bitcast i32 %b2 to <2 x half>
-%b3half = bitcast i32 %b3 to <2 x half>
-%b4half = bitcast i32 %b4 to <2 x half>
-%b5half = bitcast i32 %b5 to <2 x half>
-%b6half = bitcast i32 %b6 to <2 x half>
-%b7half = bitcast i32 %b7 to <2 x half>
-
-%c0 = extractelement <8 x float> %c, i32 0
-%c1 = extractelement <8 x float> %c, i32 1
-%c2 = extractelement <8 x float> %c, i32 2
-%c3 = extractelement <8 x float> %c, i32 3
-%c4 = extractelement <8 x float> %c, i32 4
-%c5 = extractelement <8 x float> %c, i32 5
-%c6 = extractelement <8 x float> %c, i32 6
-%c7 = extractelement <8 x float> %c, i32 7
-
-%result = call {float, float, float, float, float, float, float, float} @llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32(<2 x half> %a0half, <2 x half> %a1half, <2 x half> %a2half, <2 x half> %a3half, <2 x half> %a4half, <2 x half> %a5half, <2 x half> %a6half, <2 x half> %a7half, <2 x half> %b0half, <2 x half> %b1half, <2 x half> %b2half, <2 x half> %b3half, <2 x half> %b4half, <2 x half> %b5half, <2 x half> %b6half, <2 x half> %b7half, float %c0, float %c1, float %c2, float %c3, float %c4, float %c5, float %c6, float %c7)
-
-%v0 = extractvalue {float, float, float, float, float, float, float, float} %result, 0
-%v1 = extractvalue {float, float, float, float, float, float, float, float} %result, 1
-%v2 = extractvalue {float, float, float, float, float, float, float, float} %result, 2
-%v3 = extractvalue {float, float, float, float, float, float, float, float} %result, 3
-%v4 = extractvalue {float, float, float, float, float, float, float, float} %result, 4
-%v5 = extractvalue {float, float, float, float, float, float, float, float} %result, 5
-%v6 = extractvalue {float, float, float, float, float, float, float, float} %result, 6
-%v7 = extractvalue {float, float, float, float, float, float, float, float} %result, 7
-%vec0 = insertelement <8 x float> poison, float %v0, i32 0
-%vec1 = insertelement <8 x float> %vec0, float %v1, i32 1
-%vec2 = insertelement <8 x float> %vec1, float %v2, i32 2
-%vec3 = insertelement <8 x float> %vec2, float %v3, i32 3
-%vec4 = insertelement <8 x float> %vec3, float %v4, i32 4
-%vec5 = insertelement <8 x float> %vec4, float %v5, i32 5
-%vec6 = insertelement <8 x float> %vec5, float %v6, i32 6
-%vec7 = insertelement <8 x float> %vec6, float %v7, i32 7
-ret <8 x float> %vec7
+  %vec1 = insertelement <8 x float> %vec0, float %v1, i32 1
+  %vec2 = insertelement <8 x float> %vec1, float %v2, i32 2
+  %vec3 = insertelement <8 x float> %vec2, float %v3, i32 3
+  %vec4 = insertelement <8 x float> %vec3, float %v4, i32 4
+  %vec5 = insertelement <8 x float> %vec4, float %v5, i32 5
+  %vec6 = insertelement <8 x float> %vec5, float %v6, i32 6
+  %vec7 = insertelement <8 x float> %vec6, float %v7, i32 7
+  ret <8 x float> %vec7
 }
 
 define weak_odr i32 @adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* %ptr, <8 x float> %out, i32 %stride) nounwind readnone alwaysinline {
