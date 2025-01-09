@@ -246,7 +246,7 @@ void CodeGen_PTX_Dev::init_module() {
         {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Int(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16", {Handle(), Int(32), Int(32)}, true},
         {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32", {Handle(), Int(32), Int(32)}, true},
         {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32", {Int(32, 8), Int(32, 8), Float(32, 8)}, true},
-        {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32", {Handle(), Float(32, 8), Int(32)}, true},
+        {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32", {Handle(), Float(32, 8), Int(32), Int(32)}, true},
 
     };
 

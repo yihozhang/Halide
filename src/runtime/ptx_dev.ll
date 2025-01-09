@@ -567,7 +567,7 @@ define weak_odr <8 x float> @adapted.llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f3
   ret <8 x float> %vec7
 }
 
-define weak_odr i32 @adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* %ptr, <8 x float> %out, i32 %stride) nounwind readnone alwaysinline {
+define weak_odr i32 @adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* %ptr, <8 x float> %out, i32 %offset, i32 %stride) nounwind readnone alwaysinline {
   %v0 = extractelement <8 x float> %out, i32 0
   %v1 = extractelement <8 x float> %out, i32 1
   %v2 = extractelement <8 x float> %out, i32 2
@@ -575,8 +575,10 @@ define weak_odr i32 @adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8*
   %v4 = extractelement <8 x float> %out, i32 4
   %v5 = extractelement <8 x float> %out, i32 5
   %v6 = extractelement <8 x float> %out, i32 6
-  %v7 = extractelement <8 x float> %out, i32 7 
-  call void @llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* %ptr, float %v0, float %v1, float %v2, float %v3, float %v4, float %v5, float %v6, float %v7, i32 %stride)
+  %v7 = extractelement <8 x float> %out, i32 7
+  
+  %start = getelementptr i8, i8* %ptr, i32 %offset  
+  call void @llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32(i8* %start, float %v0, float %v1, float %v2, float %v3, float %v4, float %v5, float %v6, float %v7, i32 %stride)
   ret i32 0
 }
 
