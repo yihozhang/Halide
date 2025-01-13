@@ -101,7 +101,7 @@
                     (vec-of (Var (Handle 1) (V store-name))
                         tile
                         base
-                        (Bop (Mul) n-stride (IntImm32 bytes))
+                        n-stride
                     ))))
         (union s new-s)
     ))
