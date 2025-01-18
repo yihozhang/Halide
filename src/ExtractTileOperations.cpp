@@ -1007,46 +1007,36 @@ class EnforceWMMALanes : public IRMutator {
     };
 
 protected:
-    bool in_wmma = false;
+    bool wmma_used = false;
 
     Stmt visit(const Allocate *op) override {
         if (op->memory_type == MemoryType::WMMAAccumulator) {
+            internal_assert(op->constant_allocation_size() % 32 == 0);
             internal_assert(op->type.lanes() == 1);
-            internal_assert(op->extents.size() == 1);
-            internal_assert(op->extents[0].as<IntImm>()->value % 32 == 0);
-            ScopedValue<bool> old_in_wmma(in_wmma, true);
 
             std::vector<string> curr_tile_vars(this->tile_vars);
             curr_tile_vars.push_back(op->name);
             ScopedValue<vector<string>> old_tile_vars(tile_vars, std::move(curr_tile_vars));
 
             auto body = mutate(op->body);
-            auto lanes = op->extents[0].as<IntImm>()->value / 32;
+            auto lanes = op->constant_allocation_size() / 32;
             return Allocate::make(op->name,
                                   op->type.with_lanes(lanes),
-                                  MemoryType::WMMAAccumulator, op->extents, const_true(),
-                                  For::make("wmma_warp_idx" + gpu_thread_name(0), 0, 32, ForType::GPULane, Partition::Never, DeviceAPI::CUDA,
-                                            body));
+                                  MemoryType::WMMAAccumulator, {1}, const_true(),
+                                  body);
         } else {
             return IRMutator::visit(op);
         }
     }
 
-    Stmt visit(const For *op) override {
-        if (in_wmma && op->for_type == ForType::GPUThread) {
-            auto extent = op->extent.as<IntImm>();
-            auto min = op->min.as<IntImm>();
-            internal_assert(extent && min && extent->value == 1 && min->value == 0) << "Intrinsics for WMMA operation should be presented as a single-thread operation";
-
-            return mutate(op->body);
-        }
-
-        return IRMutator::visit(op);
-    }
-
     Expr visit(const Call *op) override {
+        // HACK: this makes sense only for all zero initialization
+        // if (op->name == "wmma.load.c.sync.aligned.row.m16n16k16.f32") {
+        //     wmma_used = true;
+        //     return make_zero(intrinsic_types[op->name]);
+        // } else 
         if (intrinsic_types.count(op->name)) {
-            internal_assert(in_wmma);
+            wmma_used = true;
             internal_assert(op->type.lanes() % 32 == 0);
             return Call::make(
                 intrinsic_types[op->name],
@@ -1058,13 +1048,15 @@ protected:
                 op->image,
                 op->param);
         } else {
+            if (op->name == "wmma.store.d.sync.aligned.row.m16n16k16.f32") {
+                wmma_used = true;
+            }
             return IRMutator::visit(op);
         }
     }
 
     Expr visit(const Load *load) override {
         if (std::find(tile_vars.begin(), tile_vars.end(), load->name) != tile_vars.end()) {
-            internal_assert(in_wmma);
             internal_assert(load->type.lanes() % 32 == 0);
             int tile_lanes = load->type.lanes() / 32;
             Type tile_type = load->type.with_lanes(tile_lanes);
@@ -1080,24 +1072,38 @@ protected:
         }
     }
 
+    Stmt visit(const Evaluate *op) override {
+        internal_assert(!wmma_used);
+        auto new_op = IRMutator::visit(op);
+        if (wmma_used) {
+            wmma_used = false;
+            return For::make("wmma_gpu_lane.thread_id_x", 0, 32, ForType::GPULane, Partition::Auto, DeviceAPI::CUDA, new_op);
+        } else {
+            return new_op;
+        }
+    }
+
     Stmt visit(const Store *store) override {
         if (std::find(tile_vars.begin(), tile_vars.end(), store->name) != tile_vars.end()) {
-            std::cerr << store->name << " with type " << store->value.type() << "\n";
-            internal_assert(in_wmma);
             internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
             internal_assert(store->value.type().lanes() % 32 == 0);
             int tile_lanes = store->value.type().lanes() / 32;
 
             // There should not be a Load in places other than value,
             // so we don't need to mutate them.
+            internal_assert(!wmma_used);
             Expr value = mutate(store->value);
-            return Store::make(
+            internal_assert(wmma_used);
+            wmma_used = false;
+            auto op = Store::make(
                 store->name,
                 value,
                 Ramp::make(0, 1, tile_lanes),
                 store->param,
                 const_true(tile_lanes),
                 store->alignment);
+            op = For::make("wmma_gpu_lane.thread_id_x", 0, 32, ForType::GPULane, Partition::Auto, DeviceAPI::CUDA, op);
+            return op;
         } else {
             return IRMutator::visit(store);
         }
@@ -1141,6 +1147,42 @@ protected:
     }
 };
 
+// This class expects the following forms
+//  Allocate b[...] from WMMAAccumulator
+//    ...
+//    gpu_lanes / gpu_threads
+// and translates it to
+//  ...
+//  gpu_lanes / gpu_threads
+//   Allocate b[...] from WMMAAccumulator
+class PushWMMAAllocation : public IRMutator {
+    using IRMutator::visit;
+
+    vector<const Allocate *> alloc_ops;
+protected:
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::WMMAAccumulator) {
+            ScopedValue<vector<const Allocate *>> old_alloc_ops(alloc_ops);
+            alloc_ops.push_back(op);
+            return mutate(op->body);
+        }
+        return IRMutator::visit(op);
+    }
+
+    Stmt visit(const For* op) override {
+        if (op->for_type == ForType::GPULane && alloc_ops.size() > 0) {
+            auto body = op->body;
+            for (auto iter = alloc_ops.rbegin(); iter != alloc_ops.rend(); iter++) {
+                auto alloc_op = *iter;
+                body = Allocate::make(alloc_op->name, alloc_op->type, alloc_op->memory_type, alloc_op->extents, alloc_op->condition, body);
+            }
+            return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, body);
+        } else {
+            return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, mutate(op->body));;
+        }
+    }
+};
+
 }  // namespace EqSatExtensions
 
 Stmt extract_tile_operations(const Stmt &s) {
@@ -1151,7 +1193,7 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
     auto annotated_s = EqSatExtensions::AnnotateDataMovement().mutate(s);
     EqSatExtensions::CollectStores collect_stores;
     auto result = collect_stores.mutate(annotated_s);
-    auto stores = std::move(collect_stores.stores);
+    auto &stores = collect_stores.stores;
 
     std::vector<std::pair<std::string, std::string>> bindings;
 
@@ -1166,7 +1208,7 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
     auto optimized_programs = split_string(output, "\n");
     bool amx_synthesized = false;
     std::map<std::string, Stmt> new_stores;
-    for (size_t i = 0; i < optimized_programs.size(); i++) {
+    for (size_t i = 0; i < optimized_programs.size(); ++i) {
         if (optimized_programs[i].empty()) {
             continue;
         }
@@ -1175,9 +1217,8 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
         amx_synthesized = amx_synthesized || optimized.find("tile_matmul") != string::npos;
 
         EqSatExtensions::EqSatIRParser parser(optimized);
-        auto opvalue = parser.parse_stmt();
 
-        new_stores[name] = opvalue;
+        new_stores[name] = parser.parse_stmt();
     }
     if (!amx_synthesized) {
         std::cerr << "amx NOT synthesized\n";
@@ -1189,6 +1230,10 @@ Stmt eqsat_extract_tile_operations(const Stmt &s) {
     result = EqSatExtensions::EnforceWMMALanes().mutate(result);
     result = EqSatExtensions::DesugarIntrinsics().mutate(result);
     return result;
+}
+
+Stmt post_process_wmma(const Stmt &s) {
+    return EqSatExtensions::PushWMMAAllocation().mutate(s);
 }
 
 std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&binding) {

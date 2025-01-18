@@ -189,6 +189,8 @@ Stmt extract_tile_operations(const Stmt &s);
 
 Stmt eqsat_extract_tile_operations(const Stmt &s);
 
+Stmt post_process_wmma(const Stmt &s);
+
 // EqSat stuffs start here
 std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&);
 
