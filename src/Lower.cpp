@@ -354,11 +354,26 @@ void lower_impl(const vector<Function> &output_funcs,
     s = simplify(s);
     log("Lowering after vectorizing:", s);
 
+    debug(1) << "cuda capability: " << t.get_cuda_capability_lower_bound() << "\n";
+    if (t.has_feature(Target::AVX512_SapphireRapids) || t.get_cuda_capability_lower_bound() >= 70) {
+        debug(1) << "Extracting tile operations...\n";
+        s = eqsat_extract_tile_operations(s);
+        log("Lowering after extracting tile operations:", s);
+    }
+    s = simplify(s);
+    log("Simplifying:", s);
+
     if (t.has_gpu_feature() ||
         t.has_feature(Target::Vulkan)) {
         debug(1) << "Injecting per-block gpu synchronization...\n";
         s = fuse_gpu_thread_loops(s);
         log("Lowering after injecting per-block gpu synchronization:", s);
+    }
+
+    if (t.get_cuda_capability_lower_bound() >= 70) {
+        debug(1) << "Postprocessing for WMMA cuda tile extractions\n";
+        s = post_process_wmma(s);
+        log("Lowering after postprocessing for WMMA cuda tile extractions:", s);
     }
 
     debug(1) << "Detecting vector interleavings...\n";
@@ -424,12 +439,6 @@ void lower_impl(const vector<Function> &output_funcs,
     debug(1) << "Lowering unsafe promises...\n";
     s = lower_unsafe_promises(s, t);
     log("Lowering after lowering unsafe promises:", s);
-
-    if (t.has_feature(Target::AVX512_SapphireRapids)) {
-        debug(1) << "Extracting tile operations...\n";
-        s = extract_tile_operations(s);
-        log("Lowering after extracting tile operations:", s);
-    }
 
     debug(1) << "Flattening nested ramps...\n";
     s = flatten_nested_ramps(s);

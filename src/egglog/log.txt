@@ -1,0 +1,1245 @@
+[INFO ] Welcome to Egglog! (sidecar)
+[INFO ] Declared sort Loc.
+[INFO ] Declared function Mem.
+[INFO ] Declared function AMX.
+[INFO ] Declared function WMMA.
+[INFO ] Declared sort BinOp.
+[INFO ] Declared function Add.
+[INFO ] Declared function Sub.
+[INFO ] Declared function Mul.
+[INFO ] Declared function Div.
+[INFO ] Declared function Mod.
+[INFO ] Declared function Min.
+[INFO ] Declared function Max.
+[INFO ] Declared function EQ.
+[INFO ] Declared function NE.
+[INFO ] Declared function LT.
+[INFO ] Declared function LE.
+[INFO ] Declared function GT.
+[INFO ] Declared function GE.
+[INFO ] Declared function And.
+[INFO ] Declared function Or.
+[INFO ] Declared sort UnaOp.
+[INFO ] Declared function Not.
+[INFO ] Declared sort Buffer.
+[INFO ] Declared sort Parameter.
+[INFO ] Declared sort Type.
+[INFO ] Declared function Int.
+[INFO ] Declared function UInt.
+[INFO ] Declared function Float.
+[INFO ] Declared function BFloat.
+[INFO ] Declared function Handle.
+[INFO ] Declared sort Stmt.
+[INFO ] Declared sort VecInt.
+[INFO ] Declared sort Expr.
+[INFO ] Declared sort VecExpr.
+[INFO ] Declared sort Variable.
+[INFO ] Declared function V.
+[INFO ] Declared function Cast.
+[INFO ] Declared function Reinterpret.
+[INFO ] Declared function Bop.
+[INFO ] Declared function Uop.
+[INFO ] Declared function Select.
+[INFO ] Declared function Load.
+[INFO ] Declared function Ramp.
+[INFO ] Declared function Broadcast.
+[INFO ] Declared function Let.
+[INFO ] Declared function Call.
+[INFO ] Declared function Var.
+[INFO ] Declared function Shuffle.
+[INFO ] Declared function VectorReduce.
+[INFO ] Declared function IntImm.
+[INFO ] Declared function UIntImm.
+[INFO ] Declared function FloatImm.
+[INFO ] Declared function Store.
+[INFO ] Declared function Evaluate.
+[INFO ] Declared function Loc2Loc.
+[INFO ] Declared function Mem2AMX.
+[INFO ] Declared function AMX2Mem.
+[INFO ] Declared function WMMA2Mem.
+[INFO ] Declared function Mem2WMMA.
+[INFO ] Declared rule (rewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))=>.
+[INFO ] Declared rule (rewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))<=.
+[INFO ] Declared rule (rewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))=>.
+[INFO ] Declared rule (rewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))<=.
+[INFO ] Declared rule (rewrite (WMMA2Mem e) (Loc2Loc (WMMA) (Mem) e))=>.
+[INFO ] Declared rule (rewrite (WMMA2Mem e) (Loc2Loc (WMMA) (Mem) e))<=.
+[INFO ] Declared rule (rewrite (Mem2WMMA e) (Loc2Loc (Mem) (WMMA) e))=>.
+[INFO ] Declared rule (rewrite (Mem2WMMA e) (Loc2Loc (Mem) (WMMA) e))<=.
+[INFO ] Declared rule (rewrite (Loc2Loc a b (Loc2Loc b a e)) e).
+[INFO ] Declared function ExprVar.
+[INFO ] Declared function BroadcastPer.
+[INFO ] Declared function Computed.
+[INFO ] Declared function UIntOrInt.
+[INFO ] Declared rule (rewrite (UIntOrInt false i l) (UInt i l))=>.
+[INFO ] Declared rule (rewrite (UIntOrInt false i l) (UInt i l))<=.
+[INFO ] Declared rule (rewrite (UIntOrInt true i l) (Int i l))=>.
+[INFO ] Declared rule (rewrite (UIntOrInt true i l) (Int i l))<=.
+[INFO ] Declared function UIntOrIntImm.
+[INFO ] Declared rule (rewrite (UIntOrIntImm false b x) (UIntImm b x))=>.
+[INFO ] Declared rule (rewrite (UIntOrIntImm false b x) (UIntImm b x))<=.
+[INFO ] Declared rule (rewrite (UIntOrIntImm true b x) (IntImm b x))=>.
+[INFO ] Declared rule (rewrite (UIntOrIntImm true b x) (IntImm b x))<=.
+[INFO ] Declared function IntImm64.
+[INFO ] Declared rule (rewrite (IntImm64 x) (IntImm 64 x))=>.
+[INFO ] Declared rule (rewrite (IntImm64 x) (IntImm 64 x))<=.
+[INFO ] Declared function IntImm32.
+[INFO ] Declared rule (rewrite (IntImm32 x) (IntImm 32 x))=>.
+[INFO ] Declared rule (rewrite (IntImm32 x) (IntImm 32 x))<=.
+[INFO ] Declared function IntImm16.
+[INFO ] Declared rule (rewrite (IntImm16 x) (IntImm 16 x))=>.
+[INFO ] Declared rule (rewrite (IntImm16 x) (IntImm 16 x))<=.
+[INFO ] Declared ruleset amx.
+[INFO ] Declared ruleset canonicalize.
+[INFO ] Declared ruleset assemble.
+[INFO ] Declared ruleset typechecking.
+[INFO ] Declared ruleset push-down-vector-reduce.
+[INFO ] Declared function CommBop.
+[INFO ] Declared rule (rule ()
+          ((CommBop (Add))
+           (CommBop (Mul))
+           (CommBop (And))
+           (CommBop (Or))
+           (CommBop (Min))
+           (CommBop (Max))
+           (CommBop (EQ))
+           (CommBop (NE)))
+             ).
+[INFO ] Declared function AddOrSub.
+[INFO ] Declared rule (rule ()
+          ((AddOrSub (Add))
+           (AddOrSub (Sub)))
+             ).
+[INFO ] Declared function IsExpr.
+[INFO ] Declared rule (rule ((= e (Cast _type _expr)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Reinterpret _type _expr)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Bop BinOp _expr1 _expr2)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Select _expr1 _expr2 _expr3)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Load _type _string _expr)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Ramp _expr1 _expr2 _i64)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Broadcast _expr _i64)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Let _string _expr1 _expr2)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Call _string _type _vecexpr)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Var _type _string)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (Shuffle _vecexpr _vecint)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce _type _binop _expr)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared rule (rule ((= e (IntImm _bits _i64)))
+          ((IsExpr e))
+             ).
+[INFO ] Declared function MultipliedLanes.
+[INFO ] Declared rule (rewrite (MultipliedLanes (Int i l) x) (Int i (* l x))).
+[INFO ] Declared rule (rewrite (MultipliedLanes (UInt i l) x) (UInt i (* l x))).
+[INFO ] Declared rule (rewrite (MultipliedLanes (Float i l) x) (Float i (* l x))).
+[INFO ] Declared rule (rewrite (MultipliedLanes (BFloat i l) x) (BFloat i (* l x))).
+[INFO ] Declared rule (rewrite (MultipliedLanes (Handle l) x) (Handle (* l x))).
+[INFO ] Declared function LanesInType.
+[INFO ] Declared rule (rule ((= t (Int i l)))
+          ((set (LanesInType t) l))
+             ).
+[INFO ] Declared rule (rule ((= t (UInt i l)))
+          ((set (LanesInType t) l))
+             ).
+[INFO ] Declared rule (rule ((= t (Float i l)))
+          ((set (LanesInType t) l))
+             ).
+[INFO ] Declared rule (rule ((= t (BFloat i l)))
+          ((set (LanesInType t) l))
+             ).
+[INFO ] Declared rule (rule ((= t (Handle l)))
+          ((set (LanesInType t) l))
+             ).
+[INFO ] Declared function WithLanes.
+[INFO ] Declared rule (rewrite (WithLanes (Int i l) x) (Int i x)).
+[INFO ] Declared rule (rewrite (WithLanes (UInt i l) x) (UInt i x)).
+[INFO ] Declared rule (rewrite (WithLanes (Float i l) x) (Float i x)).
+[INFO ] Declared rule (rewrite (WithLanes (BFloat i l) x) (BFloat i x)).
+[INFO ] Declared rule (rewrite (WithLanes (Handle l) x) (Handle x)).
+[INFO ] Declared function has-type.
+[INFO ] Declared rule (rule ((= e (Cast ty Expr)))
+          ((has-type e ty))
+             ).
+[INFO ] Declared rule (rule ((= e (Reinterpret ty Expr)))
+          ((has-type e ty))
+             ).
+[INFO ] Declared rule (rule ((= e (Bop bop e1 e2))
+           (has-type e1 t)
+           (has-type e2 t))
+          ((has-type e t))
+             ).
+[INFO ] Declared rule (rule ((= e (Uop uop e1))
+           (has-type e1 t))
+          ((has-type e t))
+             ).
+[INFO ] Declared rule (rule ((= e (Select cond tval fval))
+           (has-type cond (UInt 1 _lanes))
+           (has-type tval ty)
+           (has-type fval ty))
+          ((has-type e ty))
+             ).
+[INFO ] Declared rule (rule ((= e (Load ty name child)))
+          ((has-type e ty))
+             ).
+[INFO ] Declared rule (rule ((= e (Ramp child s l))
+           (has-type child ty))
+          ((has-type e (MultipliedLanes ty l)))
+             ).
+[INFO ] Declared rule (rule ((= e (Broadcast child l))
+           (has-type child ty))
+          ((has-type e (MultipliedLanes ty l)))
+             ).
+[INFO ] Declared rule (rule ((= e (Let x e1 e2)))
+          ((panic 'let not supported'))
+             ).
+[INFO ] Declared rule (rule ((= e (Call fn out-type args)))
+          ((has-type e out-type))
+             ).
+[INFO ] Declared rule (rule ((= e (Var ty x)))
+          ((has-type e ty))
+             ).
+[INFO ] Declared rule (rule ((= e (Shuffle VecExpr VecInt)))
+          ((panic 'not supported'))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce ty BinOp Expr)))
+          ((has-type e ty))
+             ).
+[INFO ] Declared rule (rule ((= e (IntImm bits i64)))
+          ((has-type e (Int bits 1)))
+             ).
+[INFO ] Declared rule (rule ((= e (UIntImm bits i64)))
+          ((has-type e (UInt bits 1)))
+             ).
+[INFO ] Declared rule (rule ((= e (FloatImm bits f64)))
+          ((has-type e (Float bits 1)))
+             ).
+[INFO ] Declared rule (rule ((= e (Loc2Loc l1 l2 e1))
+           (has-type e1 t))
+          ((has-type e t))
+             ).
+[INFO ] Declared rule (rule ((= e (BroadcastPer p e1 l))
+           (has-type e1 t))
+          ((has-type e (MultipliedLanes t l)))
+             ).
+[INFO ] Declared rule (rule ((has-type e t1)
+           (has-type e t2)
+           (!= t1 t2))
+          ((extract e 0)
+           (extract t1 0)
+           (extract t2 0)
+           (panic 'type error'))
+             ).
+[INFO ] Declared rule (rewrite (VectorReduce t-outer bop (Cast t-inner e)) (Cast t-outer (VectorReduce (WithLanes t-e l-outer) bop e)) :when ((has-type e t-e) (= l-outer (LanesInType t-outer)))).
+[INFO ] Declared rule (rule ((= bc (Broadcast e lo))
+           (has-type e t)
+           (= p (LanesInType t)))
+          ((union bc (BroadcastPer p e lo)))
+             ).
+[INFO ] Declared rule (rule ((= bcp (BroadcastPer p e lo))
+           (has-type e t)
+           (= p (LanesInType t)))
+          ((union bcp (Broadcast e lo)))
+             ).
+[INFO ] Declared rule (rewrite (Broadcast (Broadcast x l0) l1) (Broadcast x (* l0 l1))).
+[INFO ] Declared rule (rewrite (Bop bop a b) (Bop bop b a) :when ((CommBop bop))).
+[INFO ] Declared rule (rewrite (Broadcast x 1) x).
+[INFO ] Declared rule (rewrite (Broadcast (Load type name index) lanes) (Load (MultipliedLanes type lanes) name (Broadcast index lanes))).
+[INFO ] Declared rule (rewrite (Broadcast (Cast type expr) lanes) (Cast (MultipliedLanes type lanes) (Broadcast expr lanes))).
+[INFO ] Declared rule (rewrite (BroadcastPer p x 1) x).
+[INFO ] Declared rule (rewrite (BroadcastPer p (Load type name index) lanes) (Load (MultipliedLanes type lanes) name (BroadcastPer p index lanes))).
+[INFO ] Declared rule (rewrite (BroadcastPer p (Cast type expr) lanes) (Cast (MultipliedLanes type lanes) (BroadcastPer p expr lanes))).
+[INFO ] Declared rule (rewrite (Cast type (BroadcastPer p x l)) (BroadcastPer p (Cast (WithLanes type lx) x) l) :when ((has-type x t) (= (LanesInType t) lx))).
+[INFO ] Declared rule (rewrite (BroadcastPer p (Broadcast x l0) l1) (Broadcast (BroadcastPer p x l1) l0) :when ((has-type x t) (= curr-p (LanesInType t)) (>= curr-p p))).
+[INFO ] Declared rule (rewrite (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1) (Ramp (BroadcastPer p x l1) (Broadcast s (* curr-p l1)) l0) :when ((has-type x t) (= curr-p (LanesInType t)) (>= curr-p p))).
+[INFO ] Declared rule (rewrite (BroadcastPer p (Broadcast x l0) l1) (Broadcast x (* l0 l1)) :when ((has-type x t) (= curr-p (LanesInType t)) (< curr-p p) (> (* curr-p l0) p))).
+[INFO ] Declared rule (rewrite (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1) (Ramp (Broadcast (Ramp x (Broadcast s curr-p) (/ p curr-p)) l1) (Broadcast (Bop (Mul) s (UIntOrIntImm signed bits (/ p curr-p))) (* p l1)) (/ l0 (/ p curr-p))) :when ((has-type x (UIntOrInt signed bits curr-p)) (< curr-p p) (> (* curr-p l0) p) (= 0 (% p curr-p)) (= 0 (% l0 (/ p curr-p))))).
+[INFO ] Declared rule (rewrite (Bop bop (Broadcast a l1) (Broadcast b l2)) (Broadcast (Bop bop (Broadcast a (/ l1 l2)) b) l2) :when ((> l1 l2) (= 0 (% l1 l2)))).
+[INFO ] Declared rule (rewrite (Bop bop (Broadcast a l1) (Broadcast b l2)) (Broadcast (Bop bop a (Broadcast b (/ l2 l1))) l1) :when ((< l1 l2) (= 0 (% l2 l1)))).
+[INFO ] Declared rule (rewrite (Bop bop (Broadcast a l1) (Ramp x s l2)) (Bop bop (Broadcast (Broadcast a (/ l1 l2)) l2) (Ramp x s l2)) :when ((> l1 l2) (= 0 (% l1 l2)))).
+[INFO ] Declared rule (rewrite (Bop bop (Ramp x s l2) (Broadcast a l1)) (Bop bop (Ramp x s l2) (Broadcast (Broadcast a (/ l1 l2)) l2)) :when ((> l1 l2) (= 0 (% l1 l2)))).
+[INFO ] Declared rule (rewrite (Bop bop (BroadcastPer p a l) (BroadcastPer p b l)) (BroadcastPer p (Bop bop a b) l))=>.
+[INFO ] Declared rule (rewrite (Bop bop (BroadcastPer p a l) (BroadcastPer p b l)) (BroadcastPer p (Bop bop a b) l))<=.
+[INFO ] Declared rule (rewrite (Bop add-or-sub (Ramp base stride lanes) (Broadcast x lanes)) (Ramp (Bop add-or-sub base x) stride lanes) :when ((AddOrSub add-or-sub))).
+[INFO ] Declared rule (rewrite (Bop add-or-sub (Ramp b1 s1 l) (Ramp b2 s2 l)) (Ramp (Bop add-or-sub b1 b2) (Bop add-or-sub s1 s2) l) :when ((AddOrSub add-or-sub))).
+[INFO ] Declared rule (rewrite (Bop (Mul) (Ramp b s l) (Broadcast x l)) (Ramp (Bop (Mul) b x) (Bop (Mul) s x) l)).
+[INFO ] Declared rule (rewrite (Bop (Mod) (Ramp (IntImm bits base) (IntImm bits 1) lanes) (Broadcast (IntImm bits x) lanes)) (Broadcast (Ramp (IntImm bits 0) (IntImm bits 1) x) (/ lanes x)) :when ((= (% lanes x) 0) (= (% base x) 0))).
+[INFO ] Declared rule (rewrite (Bop (Div) (Ramp (IntImm bits base) (IntImm bits 1) lanes) (Broadcast (IntImm bits x) lanes)) (Ramp (Broadcast (IntImm bits (/ base x)) x) (Broadcast (IntImm bits 1) x) (/ lanes x)) :when ((= (% lanes x) 0) (= (% base x) 0))).
+[INFO ] Declared rule (rewrite (Bop add-or-sub (Ramp base stride r-lanes) (Broadcast x b-lanes)) (Ramp (Bop add-or-sub base (Broadcast x (/ b-lanes r-lanes))) stride r-lanes) :when ((= 0 (% b-lanes r-lanes)) (AddOrSub add-or-sub))).
+[INFO ] Declared rule (rewrite (Ramp x s 1) x).
+[INFO ] Declared rule (rewrite x (Ramp x (Broadcast (IntImm b 0) l) 1) :when ((IsExpr x) (has-type x (Int b l)))).
+[INFO ] Declared rule (rewrite x (Broadcast x 1) :when ((IsExpr x))).
+[INFO ] Declared rule (rule ((has-type e (UIntOrInt sign bits lanes)))
+          ((union e (Bop (Add) e (Broadcast (UIntOrIntImm sign bits 0) lanes))))
+             ).
+[INFO ] Declared rule (rewrite (Bop (Add) (IntImm bits a) (IntImm bits b)) (IntImm bits (+ a b))).
+[INFO ] Declared rule (rewrite (Bop (Sub) (IntImm bits a) (IntImm bits b)) (IntImm bits (- a b))).
+[INFO ] Declared rule (rewrite (Bop (Mul) (IntImm bits a) (IntImm bits b)) (IntImm bits (* a b))).
+[INFO ] Declared rule (rewrite (Bop (Div) (IntImm bits a) (IntImm bits b)) (IntImm bits (/ a b))).
+[INFO ] Declared rule (rewrite (Bop (Mod) (IntImm bits a) (IntImm bits b)) (IntImm bits (% a b))).
+[INFO ] Declared rule (rewrite (Bop (Min) (IntImm bits a) (IntImm bits b)) (IntImm bits (min a b))).
+[INFO ] Declared rule (rewrite (Bop (Max) (IntImm bits a) (IntImm bits b)) (IntImm bits (max a b))).
+[INFO ] Declared rule (rewrite (Bop (EQ) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((= a b))).
+[INFO ] Declared rule (rewrite (Bop (EQ) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((!= a b))).
+[INFO ] Declared rule (rewrite (Bop (NE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((= a b))).
+[INFO ] Declared rule (rewrite (Bop (NE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((!= a b))).
+[INFO ] Declared rule (rewrite (Bop (LT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((< a b))).
+[INFO ] Declared rule (rewrite (Bop (LT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((>= a b))).
+[INFO ] Declared rule (rewrite (Bop (LE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((<= a b))).
+[INFO ] Declared rule (rewrite (Bop (LE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((> a b))).
+[INFO ] Declared rule (rewrite (Bop (GT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((> a b))).
+[INFO ] Declared rule (rewrite (Bop (GT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((<= a b))).
+[INFO ] Declared rule (rewrite (Bop (GE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((>= a b))).
+[INFO ] Declared rule (rewrite (Bop (GE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((< a b))).
+[INFO ] Declared function make-aligned.
+[INFO ] Declared rule (rule ((make-aligned a b))
+          ((make-aligned b a))
+             ).
+[INFO ] Declared rule (rule ((make-aligned (Broadcast e1 b1) (Broadcast e2 b2))
+           (< b1 b2)
+           (= (% b2 b1) 0)
+           (!= b1 1))
+          ((union (Broadcast e2 b2) (Broadcast (Broadcast e2 (/ b2 b1)) b1))
+           (subsume (Broadcast e2 b2)))
+             ).
+[INFO ] Declared rule (rule ((make-aligned (Ramp e1 s1 l1) (Broadcast e2 b2))
+           (< l1 b2)
+           (= (% b2 l1) 0)
+           (!= l1 1))
+          ((union (Broadcast e2 b2) (Broadcast (Broadcast e2 (/ b2 l1)) l1))
+           (subsume (Broadcast e2 b2)))
+             ).
+[INFO ] Declared rule (rule ((make-aligned (Broadcast e1 b1) (Ramp e2 s2 l2))
+           (< b1 l2)
+           (= (% l2 b1) 0)
+           (!= b1 1)
+           (has-type e2 (UIntOrInt sign bits lanes)))
+          ((union (Ramp e2 s2 l2) (Ramp (Ramp e2 s2 (/ l2 b1)) (Bop (Mul) s2 (Broadcast (UIntOrIntImm sign bits (/ l2 b1)) lanes)) b1))
+           (subsume (Ramp e2 s2 l2)))
+             ).
+[INFO ] Declared rule (rule ((make-aligned (Ramp e1 s1 l1) (Ramp e2 s2 l2))
+           (< l1 l2)
+           (= (% l2 l1) 0)
+           (!= l1 1)
+           (has-type e2 (UIntOrInt sign bits lanes)))
+          ((union (Ramp e2 s2 l2) (Ramp (Ramp e2 s2 (/ l2 l1)) (Bop (Mul) s2 (Broadcast (UIntOrIntImm sign bits (/ l2 l1)) lanes)) l1))
+           (subsume (Ramp e2 s2 l2)))
+             ).
+[INFO ] Declared rule (rule ((make-aligned (Ramp e1 s1 l) (Ramp e2 s2 l)))
+          ((make-aligned e1 e2))
+             ).
+[INFO ] Declared rule (rule ((make-aligned (Ramp e1 s1 l) (Broadcast e2 l)))
+          ((make-aligned e1 e2))
+             ).
+[INFO ] Declared rule (rule ((make-aligned (Broadcast e1 b) (Broadcast e2 b)))
+          ((make-aligned e1 e2))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce (UIntOrInt signed 32 out-lanes) (Add) (Bop (Mul) (Cast (UIntOrInt signed 32 tot-lanes) lhs) (Cast (UIntOrInt signed 32 tot-lanes) rhs))))
+           (= lhs (Load (UIntOrInt signed 8 tot-lanes) lhs-name lhs-idx))
+           (= rhs (Load (UIntOrInt signed 8 tot-lanes) rhs-name rhs-idx)))
+          ((make-aligned lhs-idx rhs-idx))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 tot-lanes) lhs) (Cast (Float 32 tot-lanes) rhs))))
+           (= lhs (Load (BFloat 16 tot-lanes) lhs-name lhs-idx))
+           (= rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-idx)))
+          ((make-aligned lhs-idx rhs-idx))
+             ).
+[INFO ] Declared sort I64ExprBinFn.
+[INFO ] Declared sort InvertedIndex.
+[INFO ] Declared function InvRamp.
+[INFO ] Declared function InvBroadcast.
+[INFO ] Declared function InvertedIndexEnd.
+[INFO ] Declared function assemble-inv-ind.
+[INFO ] Declared rule (rewrite (assemble-inv-ind m e (InvertedIndexEnd)) e).
+[INFO ] Declared rule (rewrite (assemble-inv-ind m e (InvRamp i (Broadcast s sl) l)) (assemble-inv-ind m (Ramp e (Broadcast s (/ sl m)) l) i) :when ((= (% sl m) 0))).
+[INFO ] Declared rule (rewrite (assemble-inv-ind m e (InvBroadcast i l)) (assemble-inv-ind m (Broadcast e l) i)).
+[INFO ] Declared function remove-aligned-bc.
+[INFO ] Declared function remove-aligned-bc-impl.
+[INFO ] Declared rule (rule ((remove-aligned-bc origin modified left right))
+          ((remove-aligned-bc-impl origin modified left right (InvertedIndexEnd) (InvertedIndexEnd)))
+             ).
+[INFO ] Declared rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)
+           (= (Broadcast e1+ l) left)
+           (= (Broadcast e2+ l) right)
+           (!= l 1)
+           (has-type e1+ t)
+           (= broadcast-per (LanesInType t)))
+          ((let new-left (assemble-inv-ind l e1+ inv-left))
+           (let new-right (assemble-inv-ind l e2+ inv-right))
+           (union origin (unstable-app modified broadcast-per l new-left new-right)))
+             ).
+[INFO ] Declared rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)
+           (= (Ramp e1+ s1 l) left)
+           (= (Broadcast e2+ l) right)
+           (!= l 1))
+          ((remove-aligned-bc-impl origin modified e1+ e2+ (InvRamp inv-left s1 l) (InvBroadcast inv-right l)))
+             ).
+[INFO ] Declared rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)
+           (= (Broadcast e1+ l) left)
+           (= (Ramp e2+ s2 l) right)
+           (!= l 1))
+          ((remove-aligned-bc-impl origin modified e1+ e2+ (InvBroadcast inv-left l) (InvRamp inv-right s2 l)))
+             ).
+[INFO ] Declared rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)
+           (= (Ramp e1+ s1 l) left)
+           (= (Ramp e2+ s2 l) right)
+           (!= l 1))
+          ((remove-aligned-bc-impl origin modified e1+ e2+ (InvRamp inv-left s1 l) (InvRamp inv-right s2 l)))
+             ).
+[INFO ] Declared function matrix-multiplication-int/uint-cont.
+[INFO ] Declared function matrix-multiplication-float-cont.
+[INFO ] Declared rule (rewrite (matrix-multiplication-int/uint-cont signed lhs-name rhs-name old-out-lanes old-tot-lanes broadcast-per m lhs-idx rhs-idx) (BroadcastPer (/ broadcast-per (/ tot-lanes out-lanes)) (VectorReduce (UIntOrInt signed 32 out-lanes) (Add) (Bop (Mul) (Cast (UIntOrInt signed 32 tot-lanes) (Load (UIntOrInt signed 8 tot-lanes) lhs-name lhs-idx)) (Cast (UIntOrInt signed 32 tot-lanes) (Load (UIntOrInt signed 8 tot-lanes) rhs-name rhs-idx)))) m) :when ((= out-lanes (/ old-out-lanes m)) (= tot-lanes (/ old-tot-lanes m)))).
+[INFO ] Declared rule (rewrite (matrix-multiplication-float-cont lhs-name rhs-name old-out-lanes old-tot-lanes broadcast-per m lhs-idx rhs-idx) (BroadcastPer (/ broadcast-per (/ tot-lanes out-lanes)) (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 tot-lanes) (Load (BFloat 16 tot-lanes) lhs-name lhs-idx)) (Cast (Float 32 tot-lanes) (Load (BFloat 16 tot-lanes) rhs-name rhs-idx)))) m) :when ((= out-lanes (/ old-out-lanes m)) (= tot-lanes (/ old-tot-lanes m)))).
+[INFO ] Declared rule (rule ((= e (VectorReduce (UIntOrInt signed 32 out-lanes) (Add) (Bop (Mul) (Cast (UIntOrInt signed 32 tot-lanes) lhs) (Cast (UIntOrInt signed 32 tot-lanes) rhs))))
+           (= lhs (Load (UIntOrInt signed 8 tot-lanes) lhs-name lhs-idx))
+           (= rhs (Load (UIntOrInt signed 8 tot-lanes) rhs-name rhs-idx)))
+          ((remove-aligned-bc e (unstable-fn 'matrix-multiplication-int/uint-cont' signed lhs-name rhs-name out-lanes tot-lanes) lhs-idx rhs-idx))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 tot-lanes) lhs) (Cast (Float 32 tot-lanes) rhs))))
+           (= lhs (Load (BFloat 16 tot-lanes) lhs-name lhs-idx))
+           (= rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-idx)))
+          ((remove-aligned-bc e (unstable-fn 'matrix-multiplication-float-cont' lhs-name rhs-name out-lanes tot-lanes) lhs-idx rhs-idx))
+             ).
+[INFO ] Declared function remove-innermost-bc-demand.
+[INFO ] Declared function remove-innermost-bc.
+[INFO ] Declared rule (rule ((VectorReduce ty (Add) (Bop (Mul) a b)))
+          ((remove-innermost-bc-demand b))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce ty (Add) (Bop (Mul) a b)))
+           (remove-innermost-bc b shrinked-b m)
+           (has-type shrinked-b arg-type))
+          ((subsume (VectorReduce ty (Add) (Bop (Mul) a b)))
+           (union e (VectorReduce ty (Add) (Bop (Mul) (VectorReduce arg-type (Add) a) shrinked-b))))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand (Cast ty e)))
+          ((remove-innermost-bc-demand e))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand (Load ty x e)))
+          ((remove-innermost-bc-demand e))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand (Ramp e s l))
+           (!= l 1))
+          ((remove-innermost-bc-demand e))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand (Broadcast e l))
+           (has-type e ty)
+           (> (LanesInType ty) 1))
+          ((remove-innermost-bc-demand e))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand (Broadcast e l))
+           (has-type e ty)
+           (= (LanesInType ty) 1)
+           (!= l 1))
+          ((remove-innermost-bc (Broadcast e l) e l))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand e)
+           (= e (Cast ty e1))
+           (remove-innermost-bc e1 removed m)
+           (= l (LanesInType ty))
+           (= (% l m) 0))
+          ((remove-innermost-bc e (Cast (WithLanes ty (/ l m)) removed) m))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand e)
+           (= e (Load ty x e1))
+           (remove-innermost-bc e1 removed m)
+           (= l (LanesInType ty))
+           (= (% l m) 0))
+          ((remove-innermost-bc e (Load (WithLanes ty (/ l m)) x removed) m))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand e)
+           (= e (Broadcast e1 l))
+           (remove-innermost-bc e1 removed m)
+           (!= l 1))
+          ((remove-innermost-bc e (Broadcast removed l) m))
+             ).
+[INFO ] Declared rule (rule ((remove-innermost-bc-demand e)
+           (= e (Ramp e1 (Broadcast s ml) l))
+           (remove-innermost-bc e1 removed m)
+           (!= l 1)
+           (= (% ml m) 0))
+          ((remove-innermost-bc e (Ramp removed (Broadcast s (/ ml l)) l) m))
+             ).
+[INFO ] Declared function AMXAllocation.
+[INFO ] Declared function AMXShape.
+[INFO ] Declared rule (rule ((AMXAllocation name rows colbytes)
+           (= e (Var t (V name))))
+          ((AMXShape e rows colbytes))
+             ).
+[INFO ] Declared rule (rule ((AMXShape e rows colbytes)
+           (Store name e index))
+          ((AMXAllocation name rows colbytes))
+             ).
+[INFO ] Declared rule (rule ((AMXAllocation name rows colbytes)
+           (Store name e index))
+          ((AMXShape e rows colbytes))
+             ).
+[INFO ] Declared function amx-int/uint-lhs.
+[INFO ] Declared function amx-float-lhs.
+[INFO ] Declared rule (rule ((= orig-lhs (Load (UIntOrInt lhs-signed 8 tot-lanes) lhs-name lhs-index))
+           (= lhs-index (Ramp (Broadcast (Ramp lhs-base (IntImm32 1) r-lanes) y-lanes) (Broadcast x-stride (* y-lanes r-lanes)) x-lanes)))
+          ((let new-lhs (Call 'tile_load' (UIntOrInt lhs-signed 8 (* x-lanes r-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
+           (amx-int/uint-lhs orig-lhs x-lanes y-lanes r-lanes new-lhs))
+             ).
+[INFO ] Declared rule (rule ((= orig-lhs (Load (BFloat 16 tot-lanes) lhs-name lhs-index))
+           (= lhs-index (Ramp (Broadcast (Ramp lhs-base (IntImm32 1) r-lanes) y-lanes) (Broadcast x-stride (* y-lanes r-lanes)) x-lanes)))
+          ((let new-lhs (Call 'tile_load' (BFloat 16 (* x-lanes r-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 r-lanes) (Var (Handle 1) lhs-name) lhs-base x-stride)))
+           (amx-float-lhs orig-lhs x-lanes y-lanes r-lanes new-lhs))
+             ).
+[INFO ] Declared function amx-int/uint-rhs.
+[INFO ] Declared function amx-float-rhs.
+[INFO ] Declared rule (rule ((= orig-rhs (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index))
+           (= rhs-index (Broadcast (Ramp (Ramp (Ramp rhs-base (IntImm32 1) 4) (Broadcast rhs-r-stride 4) (/ r-lanes 4)) (Broadcast (IntImm32 4) r-lanes) y-lanes) x-lanes)))
+          ((let amx-rhs (Call 'tile_load' (UIntOrInt rhs-signed 8 (* r-lanes y-lanes)) (vec-of (IntImm16 (/ r-lanes 4)) (IntImm16 (* y-lanes 4)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+           (amx-int/uint-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs))
+             ).
+[INFO ] Declared rule (rule ((= orig-rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-index))
+           (= rhs-index (Broadcast (Ramp (Ramp (Ramp rhs-base (IntImm32 1) 2) (Broadcast rhs-r-stride 2) (/ r-lanes 2)) (Broadcast (IntImm32 2) r-lanes) y-lanes) x-lanes)))
+          ((let amx-rhs (Call 'tile_load' (BFloat 16 (* r-lanes y-lanes)) (vec-of (IntImm16 (/ r-lanes 2)) (IntImm16 (* y-lanes 2)) (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+           (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs))
+             ).
+[INFO ] Declared rule (rule ((= orig-rhs-mem (AMX2Mem orig-rhs))
+           (= orig-rhs (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index))
+           (= rhs-index (Broadcast (Ramp (Ramp (Ramp rhs-base (IntImm32 1) 4) (Broadcast rhs-r-stride 4) (/ r-lanes 4)) (Broadcast (IntImm32 4) r-lanes) y-lanes) x-lanes)))
+          ((let amx-rhs (Load (UIntOrInt rhs-signed 8 (* r-lanes y-lanes)) rhs-name (Ramp rhs-base (IntImm32 1) (* r-lanes y-lanes))))
+           (amx-int/uint-rhs orig-rhs-mem x-lanes y-lanes r-lanes amx-rhs))
+             ).
+[INFO ] Declared rule (rule ((= orig-rhs-mem (AMX2Mem orig-rhs))
+           (= orig-rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-index))
+           (= rhs-index (Broadcast (Ramp (Ramp (Ramp rhs-base (IntImm32 1) 2) (Broadcast rhs-r-stride 2) (/ r-lanes 2)) (Broadcast (IntImm32 2) r-lanes) y-lanes) x-lanes)))
+          ((let amx-rhs (Load (BFloat 16 (* r-lanes y-lanes)) rhs-name (Ramp rhs-base (IntImm32 1) (* r-lanes y-lanes))))
+           (amx-float-rhs orig-rhs-mem x-lanes y-lanes r-lanes amx-rhs))
+             ).
+[INFO ] Declared rule (rule ((= orig-rhs (Load (UIntOrInt rhs-signed 8 tot-lanes) rhs-name rhs-index))
+           (= rhs-index (Broadcast (Ramp (Ramp rhs-base rhs-r-stride r-lanes) (Broadcast (IntImm32 1) r-lanes) y-lanes) x-lanes)))
+          ((let rhs-type (UIntOrInt rhs-signed 8 (* r-lanes y-lanes)))
+           (let amx-rhs (Call 'tile_load' rhs-type (vec-of (IntImm16 (/ r-lanes 4)) (IntImm16 (* y-lanes 4)) (Var (Handle 1) (ExprVar (Mem) (Call 'KWayInterleave' (BFloat 16 (* y-lanes r-lanes)) (vec-of (IntImm32 4) (Load rhs-type rhs-name (Ramp (Ramp rhs-base (IntImm32 1) y-lanes) (Broadcast rhs-r-stride y-lanes) r-lanes)) (IntImm32 r-lanes))))) (IntImm32 0) (IntImm32 (* y-lanes 4)))))
+           (amx-int/uint-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs))
+             ).
+[INFO ] Declared rule (rule ((= orig-rhs (Load (BFloat 16 tot-lanes) rhs-name rhs-index))
+           (= rhs-index (Broadcast (Ramp (Ramp rhs-base rhs-r-stride r-lanes) (Broadcast (IntImm32 1) r-lanes) y-lanes) x-lanes)))
+          ((let rhs-type (BFloat 16 (* r-lanes y-lanes)))
+           (let amx-rhs (Call 'tile_load' rhs-type (vec-of (IntImm16 (/ r-lanes 2)) (IntImm16 (* y-lanes 2)) (Var (Handle 1) (ExprVar (Mem) (Call 'KWayInterleave' (BFloat 16 (* y-lanes r-lanes)) (vec-of (IntImm32 2) (Load rhs-type rhs-name (Ramp (Ramp rhs-base (IntImm32 1) y-lanes) (Broadcast rhs-r-stride y-lanes) r-lanes)) (IntImm32 r-lanes))))) (IntImm32 0) (IntImm32 (* y-lanes 2)))))
+           (amx-float-rhs orig-rhs x-lanes y-lanes r-lanes amx-rhs))
+             ).
+[INFO ] Declared rule (rule ((= e (Bop (Add) (VectorReduce (Int 32 out-lanes) (Add) (Bop (Mul) (Cast (Int 32 tot-lanes) lhs) (Cast (Int 32 tot-lanes) rhs))) mat))
+           (= out-lanes (* x-lanes y-lanes))
+           (= tot-lanes (* out-lanes r-lanes))
+           (amx-int/uint-lhs lhs x-lanes y-lanes r-lanes new-lhs)
+           (amx-int/uint-rhs rhs x-lanes y-lanes r-lanes new-rhs))
+          ((let new-e (Call 'tile_matmul' (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) (Mem2AMX mat) new-lhs new-rhs)))
+           (AMXShape new-e x-lanes (* y-lanes 4))
+           (union e (AMX2Mem new-e)))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce (Int 32 out-lanes) (Add) (Bop (Mul) (Cast (Int 32 tot-lanes) lhs) (Cast (Int 32 tot-lanes) rhs))))
+           (= out-lanes (* x-lanes y-lanes))
+           (= tot-lanes (* out-lanes r-lanes))
+           (amx-int/uint-lhs lhs x-lanes y-lanes r-lanes new-lhs)
+           (amx-int/uint-rhs rhs x-lanes y-lanes r-lanes new-rhs))
+          ((let initial (Call 'tile_zero' (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)))))
+           (let new-e (Call 'tile_matmul' (Int 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) initial new-lhs new-rhs)))
+           (AMXShape new-e x-lanes (* y-lanes 4))
+           (union e (AMX2Mem new-e)))
+             ).
+[INFO ] Declared rule (rule ((= e (Bop (Add) (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 tot-lanes) lhs) (Cast (Float 32 tot-lanes) rhs))) mat))
+           (= out-lanes (* x-lanes y-lanes))
+           (= tot-lanes (* out-lanes r-lanes))
+           (amx-float-lhs lhs x-lanes y-lanes r-lanes new-lhs)
+           (amx-float-rhs rhs x-lanes y-lanes r-lanes new-rhs))
+          ((let new-e (Call 'tile_matmul' (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) (Mem2AMX mat) new-lhs new-rhs)))
+           (AMXShape new-e x-lanes (* y-lanes 4))
+           (union e (AMX2Mem new-e)))
+             ).
+[INFO ] Declared rule (rule ((= e (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 tot-lanes) lhs) (Cast (Float 32 tot-lanes) rhs))))
+           (= out-lanes (* x-lanes y-lanes))
+           (= tot-lanes (* out-lanes r-lanes))
+           (amx-float-lhs lhs x-lanes y-lanes r-lanes new-lhs)
+           (amx-float-rhs rhs x-lanes y-lanes r-lanes new-rhs))
+          ((let initial (Call 'tile_zero' (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)))))
+           (let new-e (Call 'tile_matmul' (Float 32 (* x-lanes y-lanes)) (vec-of (IntImm16 x-lanes) (IntImm16 (* y-lanes 4)) (IntImm16 r-lanes) initial new-lhs new-rhs)))
+           (AMXShape new-e x-lanes (* y-lanes 4))
+           (union e (AMX2Mem new-e)))
+             ).
+[INFO ] Declared rule (rewrite (Cast ty (AMX2Mem e)) (AMX2Mem (Cast ty e)))=>.
+[INFO ] Declared rule (rewrite (Cast ty (AMX2Mem e)) (AMX2Mem (Cast ty e)))<=.
+[INFO ] Declared rule (rewrite (Cast ty (Mem2AMX e)) (Mem2AMX (Cast ty e)))=>.
+[INFO ] Declared rule (rewrite (Cast ty (Mem2AMX e)) (Mem2AMX (Cast ty e)))<=.
+[INFO ] Declared rule (rewrite (BroadcastPer p (Mem2AMX e) l) (Mem2AMX (BroadcastPer p e l)))=>.
+[INFO ] Declared rule (rewrite (BroadcastPer p (Mem2AMX e) l) (Mem2AMX (BroadcastPer p e l)))<=.
+[INFO ] Declared rule (rewrite (AMX2Mem (BroadcastPer p e l)) (BroadcastPer p (AMX2Mem e) l))=>.
+[INFO ] Declared rule (rewrite (AMX2Mem (BroadcastPer p e l)) (BroadcastPer p (AMX2Mem e) l))<=.
+[INFO ] Declared rule (rule ((= e (Mem2AMX (Broadcast (UIntOrIntImm _sign 32 0) lanes)))
+           (AMXShape e rows colbytes))
+          ((let new-e (Call 'tile_zero' (Int 32 lanes) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
+           (union e new-e))
+             ).
+[INFO ] Declared rule (rule ((= e (Mem2AMX (Broadcast (FloatImm 32 0.0) lanes)))
+           (AMXShape e rows colbytes))
+          ((let new-e (Call 'tile_zero' (Float 32 lanes) (vec-of (IntImm16 rows) (IntImm16 colbytes))))
+           (union e new-e))
+             ).
+[INFO ] Declared rule (rule ((= e (Mem2AMX value))
+           (AMXShape e row colbytes)
+           (has-type value (UIntOrInt sign 8 lanes)))
+          ((let new-e (Call 'tile_load' (UIntOrInt sign 8 lanes) (vec-of (IntImm16 row) (IntImm16 colbytes) (Var (Handle 1) (ExprVar (Mem) value)) (IntImm32 0) (IntImm32 colbytes))))
+           (union e new-e))
+             ).
+[INFO ] Declared rule (rule ((= e (Mem2AMX value))
+           (AMXShape e row colbytes)
+           (has-type value (BFloat 16 lanes)))
+          ((let new-e (Call 'tile_load' (BFloat 16 lanes) (vec-of (IntImm16 row) (IntImm16 colbytes) (Var (Handle 1) (ExprVar (Mem) value)) (IntImm32 0) (IntImm32 colbytes))))
+           (union e new-e))
+             ).
+[INFO ] Declared rule (rule ((= e (Mem2AMX (Load ty name index)))
+           (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
+           (= ty (UIntOrInt _sign 8 _lanes)))
+          ((let new-e (Call 'tile_load' ty (vec-of (IntImm16 n-lanes) (IntImm16 m-lanes) (Var (Handle 1) name) base n-stride)))
+           (union e new-e))
+             ).
+[INFO ] Declared rule (rule ((= e (Mem2AMX (Load ty name index)))
+           (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
+           (= ty (BFloat 16 _lanes)))
+          ((let new-e (Call 'tile_load' ty (vec-of (IntImm16 n-lanes) (IntImm16 (* m-lanes 2)) (Var (Handle 1) name) base n-stride)))
+           (union e new-e))
+             ).
+[INFO ] Declared rule (rule ((= e (AMX2Mem value))
+           (has-type value ty)
+           (= extent (LanesInType ty)))
+          ((union e (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent))))
+             ).
+[INFO ] Declared rule (rewrite (AMX2Mem value) (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)) :when ((has-type value ty) (= extent (LanesInType ty)))).
+[INFO ] Declared rule (rewrite (Load ty (ExprVar (AMX) value) (Ramp (IntImm32 0) (IntImm32 1) extent)) (AMX2Mem value)).
+[INFO ] Declared rule (rule ((= s (Store store-name (AMX2Mem tile) index))
+           (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
+           (= bytes 4)
+           (has-type value ty))
+          ((let new-s (Evaluate (Call 'tile_store' (Int 32 1) (vec-of (IntImm16 n-lanes) (IntImm16 (* m-lanes bytes)) (Var (Handle 1) (V store-name)) (Bop (Mul) base (IntImm32 bytes)) (Bop (Mul) n-stride (IntImm32 bytes)) tile))))
+           (union s new-s))
+             ).
+[INFO ] Declared function WMMAAllocation.
+[INFO ] Declared function WMMAShape.
+[INFO ] Declared rule (rule ((WMMAAllocation name rows cols)
+           (= e (Var t (V name))))
+          ((WMMAShape e rows cols))
+             ).
+[INFO ] Declared rule (rule ((WMMAShape e rows cols)
+           (Store name e index))
+          ((WMMAAllocation name rows cols))
+             ).
+[INFO ] Declared rule (rule ((WMMAAllocation name rows cols)
+           (Store name e index))
+          ((WMMAShape e rows cols))
+             ).
+[INFO ] Declared rule (rule ((= e (Bop (Add) (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 tot-lanes) lhs) (Cast (Float 32 tot-lanes) rhs))) mat))
+           (= out-lanes (* x-lanes y-lanes))
+           (= tot-lanes (* out-lanes r-lanes))
+           (= lhs (Load (Float 16 tot-lanes) lhs-name lhs-index))
+           (= lhs-index (Ramp (Broadcast (Ramp lhs-base (IntImm32 1) r-lanes) y-lanes) (Broadcast x-stride (* y-lanes r-lanes)) x-lanes))
+           (= rhs (Load (Float 16 tot-lanes) rhs-name rhs-index))
+           (= rhs-index (Broadcast (Ramp (Ramp rhs-base rhs-r-stride r-lanes) (Broadcast (IntImm32 1) r-lanes) y-lanes) x-lanes))
+           (= x-lanes 16)
+           (= y-lanes 16)
+           (= r-lanes 16))
+          ((let new-lhs (Call 'wmma.load.a.sync.aligned.row.m16n16k16.f16' (Float 16 256) (vec-of (Var (Handle 1) lhs-name) lhs-base x-stride)))
+           (let new-rhs (Call 'wmma.load.b.sync.aligned.row.m16n16k16.f16' (Float 16 256) (vec-of (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+           (let new-mat (Mem2WMMA mat))
+           (let new-e (Call 'wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32' (Float 32 256) (vec-of new-mat new-lhs new-rhs)))
+           (WMMAShape new-e x-lanes y-lanes)
+           (union e (WMMA2Mem new-e)))
+             ).
+[INFO ] Declared rule (rule ((= e (Mem2WMMA (Broadcast (FloatImm 32 0.0) lanes)))
+           (WMMAShape e rows cols)
+           (= lanes (* rows cols))
+           (= rows 16)
+           (= cols 16))
+          ((let new-e (Call 'wmma.load.c.sync.aligned.row.m16n16k16.f16' (Float 32 lanes) (vec-of (Var (Handle 1) (ExprVar (Mem) (Broadcast (FloatImm 32 0.0) 256))) (IntImm32 16))))
+           (union e new-e))
+             ).
+[INFO ] Declared rule (rule ((= s (Store store-name (WMMA2Mem tile) index))
+           (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
+           (= bytes 4)
+           (has-type value ty)
+           (= m-lanes 16)
+           (= n-lanes 16))
+          ((let new-s (Evaluate (Call 'wmma.store.d.sync.aligned.row.m16n16k16.f32' (Int 32 1) (vec-of (Var (Handle 1) (V store-name)) tile (Bop (Mul) n-stride (IntImm32 bytes))))))
+           (union s new-s))
+             ).
+[INFO ] Declared function collectstoresplaceholderABBBeqsatBBB0.
+[INFO ] Declared function collectstoresplaceholderBBBBeqsatBBB1.
+[INFO ] Declared function collectstoresplaceholdermatmulBBBeqsatBBB2.
+[INFO ] Declared function collectstoresplaceholdermatmulBBBeqsatBBB3.
+[INFO ] Declared function collectstoresplaceholdermatmul_global_wrapperAAA0BBBeqsatBBB4.
+[INFO ] Declared ruleset keep-best.
+[INFO ] Declared rule (rule ()
+          ((keep-best 'collectstoresplaceholderABBBeqsatBBB0' 'collectstoresplaceholderBBBBeqsatBBB1' 'collectstoresplaceholdermatmulBBBeqsatBBB2' 'collectstoresplaceholdermatmulBBBeqsatBBB3' 'collectstoresplaceholdermatmul_global_wrapperAAA0BBBeqsatBBB4' 'AMXShape' 'AMXAllocation' 'WMMAShape' 'WMMAAllocation' 'CommBop' 'AddOrSub'))
+             ).
+[INFO ] Ran schedule (seq (repeat 10 (seq (saturate (seq (run typechecking))) (run)))).
+[INFO ] Report: Rule (rule ((= e (Select cond tval fval))        (has-type cond (UInt 1 _lanes))     ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAShape e rows cols)        (Store name e index))       ((WMMAAllocati...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= e (Select _expr1 _expr2 _expr3)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Min) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((has-type e t1)        (has-type e t2)        (!= t1 t2))       ((extract...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (Handle l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (BroadcastPer p a l) (BroadcastPer p b l))))   ...: search 0.001s, apply 0.000s, num matches 2408
+    Rule (rule ((= rewrite_var__ (Bop (LT) (IntImm bits a) (IntImm bits b)))        (>= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (AMX) (Mem) e)))       ((union rewrite_var__ (A...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Mem2WMMA (Broadcast (FloatImm 32 0.0) lanes)))        (WMMAShape e ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (NE) (IntImm bits a) (IntImm bits b)))        (= a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Float i l) x)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 192
+    Rule (rule ((= e (Load ty name child)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 170
+    Rule (rule ((= rewrite_var__ (Loc2Loc a b (Loc2Loc b a e))))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 10
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Cast type expr) lanes)))       ((union ...: search 0.000s, apply 0.000s, num matches 44
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Bop bop a b) l)))       ((union rewrite...: search 0.001s, apply 0.000s, num matches 2613
+    Rule (rule ((= rewrite_var__ x)        (IsExpr x))       ((union rewrite_var__ (Broad...: search 0.000s, apply 0.000s, num matches 876
+    Rule (rule ((= e (Let x e1 e2)))       ((panic "let not supported"))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Float i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 180
+    Rule (rule ((= e (Var ty x)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 546
+    Rule (rule ((= rewrite_var__ (IntImm16 x)))       ((union rewrite_var__ (IntImm 16 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm 16 x)))       ((union rewrite_var__ (IntImm16 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Broadcast b l2)))        (< l...: search 0.001s, apply 0.000s, num matches 1068
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (BFloat i l) x)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (UIntImm bits i64)))       ((has-type e (UInt bits 1)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (Ramp x s l2) (Broadcast a l1)))        (> l1 l...: search 0.001s, apply 0.000s, num matches 888
+    Rule (rule ((= rewrite_var__ (Bop (LE) (IntImm bits a) (IntImm bits b)))        (> a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (UIntOrIntImm false b x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= s (Store store-name (WMMA2Mem tile) index))        (= index (Ramp (Ram...: search 0.000s, apply 0.000s, num matches 1034
+    Rule (rule ((= rewrite_var__ (VectorReduce t-outer bop (Cast t-inner e)))        (has...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mul) (Ramp b s l) (Broadcast x l))))       ((union...: search 0.000s, apply 0.000s, num matches 557
+    Rule (rule ((= rewrite_var__ (Broadcast (Broadcast x l0) l1)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 1278
+    Rule (rule ((= bcp (BroadcastPer p e lo))        (has-type e t)        (= p (LanesInT...: search 0.000s, apply 0.000s, num matches 958
+    Rule (rule ((= rewrite_var__ (Loc2Loc (Mem) (WMMA) e)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 23
+    Rule (rule ((= rewrite_var__ (UIntOrInt true i l)))       ((union rewrite_var__ (Int ...: search 0.000s, apply 0.000s, num matches 36
+    Rule (rule ((= e (Load _type _string _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 58
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Broadcast x l0) l1))        (has-type x...: search 0.001s, apply 0.000s, num matches 916
+    Rule (rule ((= e (Reinterpret ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce ty BinOp Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 30
+    Rule (rule ((WMMAAllocation name rows cols)        (Store name e index))       ((WMMA...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (BroadcastPer p x 1)))       ((union rewrite_var__ x))  ...: search 0.000s, apply 0.000s, num matches 718
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (UInt i l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (BFloat i l) x)))       ((union rewrite_var__...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GE) (IntImm bits a) (IntImm bits b)))        (< a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm b x)))       ((union rewrite_var__ (UIntOrIntImm...: search 0.000s, apply 0.000s, num matches 47
+    Rule (rule ((= rewrite_var__ (AMX2Mem e)))       ((union rewrite_var__ (Loc2Loc (AMX)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp b1 s1 l) (Ramp b2 s2 l)))        (...: search 0.001s, apply 0.000s, num matches 3096
+    Rule (rule ((= rewrite_var__ (Bop (EQ) (IntImm bits a) (IntImm bits b)))        (= a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Handle l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 13
+    Rule (rule ((= e (Loc2Loc l1 l2 e1))        (has-type e1 t))       ((has-type e t))  ...: search 0.000s, apply 0.000s, num matches 99
+    Rule (rule ((= rewrite_var__ (UInt i l)))       ((union rewrite_var__ (UIntOrInt fals...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle _vecexpr _vecint)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Broadcast x l0) l1))        (has-type x...: search 0.001s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ x)        (IsExpr x)        (has-type x (Int b l)))     ...: search 0.000s, apply 0.000s, num matches 716
+    Rule (rule ((= t (BFloat i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ()       ((AddOrSub (Add))        (AddOrSub (Sub)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Broadcast (Load type name index) lanes)))       ((union...: search 0.000s, apply 0.000s, num matches 56
+    Rule (rule ((= e (Call fn out-type args)))       ((has-type e out-type))          ): search 0.000s, apply 0.000s, num matches 44
+    Rule (rule ((= e (FloatImm bits f64)))       ((has-type e (Float bits 1)))          ): search 0.000s, apply 0.000s, num matches 30
+    Rule (rule ((= rewrite_var__ (Bop (Max) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (LT) (IntImm bits a) (IntImm bits b)))        (< a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mod) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Sub) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 7
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1))   ...: search 0.001s, apply 0.000s, num matches 1159
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Int i l) x)))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 228
+    Rule (rule ((= rewrite_var__ (Bop (GE) (IntImm bits a) (IntImm bits b)))        (>= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm64 x)))       ((union rewrite_var__ (IntImm 64 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Cast _type _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 49
+    Rule (rule ((= rewrite_var__ (UIntOrInt false i l)))       ((union rewrite_var__ (UIn...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm32 x)))       ((union rewrite_var__ (IntImm 32 x)...: search 0.000s, apply 0.000s, num matches 44
+    Rule (rule ((= e (Ramp _expr1 _expr2 _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 1221
+    Rule (rule ((= e (Let _string _expr1 _expr2)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Div) (Ramp (IntImm bits base) (IntImm bits 1) lane...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Uop uop e1))        (has-type e1 t))       ((has-type e t))        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Reinterpret _type _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mul) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 38
+    Rule (rule ((= rewrite_var__ (Bop (LE) (IntImm bits a) (IntImm bits b)))        (<= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GT) (IntImm bits a) (IntImm bits b)))        (> a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (WMMA) (Mem) e)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 13
+    Rule (rule ((= rewrite_var__ (UIntImm b x)))       ((union rewrite_var__ (UIntOrIntIm...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Broadcast _expr _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 1030
+    Rule (rule ((= rewrite_var__ (Bop (NE) (IntImm bits a) (IntImm bits b)))        (!= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GT) (IntImm bits a) (IntImm bits b)))        (<= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (BroadcastPer p e1 l))        (has-type e1 t))       ((has-type e (M...: search 0.001s, apply 0.000s, num matches 2269
+    Rule (rule ((= rewrite_var__ (WithLanes (Float i l) x)))       ((union rewrite_var__ ...: search 0.000s, apply 0.000s, num matches 59
+    Rule (rule ((= rewrite_var__ (Int i l)))       ((union rewrite_var__ (UIntOrInt true ...: search 0.000s, apply 0.000s, num matches 40
+    Rule (rule ((= rewrite_var__ (UIntOrIntImm true b x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 42
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp base stride lanes) (Broadcast x la...: search 0.001s, apply 0.000s, num matches 2276
+    Rule (rule ((= rewrite_var__ (Bop (Mod) (Ramp (IntImm bits base) (IntImm bits 1) lane...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle VecExpr VecInt)))       ((panic "not supported"))          ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAAllocation name rows cols)        (= e (Var t (V name))))       ((WM...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Handle l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 20
+    Rule (rule ((= e (Cast ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 148
+    Rule (rule ((= e (Bop BinOp _expr1 _expr2)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 2167
+    Rule (rule ((= rewrite_var__ (Bop bop a b))        (CommBop bop))       ((union rewri...: search 0.000s, apply 0.000s, num matches 2061
+    Rule (rule ((= rewrite_var__ (WithLanes (Int i l) x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (Mem) (AMX) e)))       ((union rewrite_var__ (M...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm 64 x)))       ((union rewrite_var__ (IntImm64 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Broadcast x 1)))       ((union rewrite_var__ x))       ...: search 0.000s, apply 0.000s, num matches 784
+    Rule (rule ((= rewrite_var__ (Broadcast (Cast type expr) lanes)))       ((union rewri...: search 0.000s, apply 0.000s, num matches 50
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1))   ...: search 0.001s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (EQ) (IntImm bits a) (IntImm bits b)))        (!= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Int i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 109
+    Rule (rule ((= rewrite_var__ (WMMA2Mem e)))       ((union rewrite_var__ (Loc2Loc (WMM...: search 0.000s, apply 0.000s, num matches 13
+    Rule (rule ((= e (Var _type _string)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 186
+    Rule (rule ((= rewrite_var__ (Cast type (BroadcastPer p x l)))        (has-type x t) ...: search 0.000s, apply 0.000s, num matches 42
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Ramp x s l2)))        (> l1 l...: search 0.001s, apply 0.000s, num matches 864
+    Rule (rule ((has-type e (UIntOrInt sign bits lanes)))       ((union e (Bop (Add) e (B...: search 0.000s, apply 0.000s, num matches 835
+    Rule (rule ((= t (UInt i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Call _string _type _vecexpr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 20
+    Rule (rule ((= e (VectorReduce _type _binop _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 10
+    Rule (rule ((= rewrite_var__ (Bop (Div) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Ramp x s 1)))       ((union rewrite_var__ x))          ...: search 0.000s, apply 0.000s, num matches 1137
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Load type name index) lanes)))       ((...: search 0.000s, apply 0.000s, num matches 49
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Broadcast b l2)))        (> l...: search 0.001s, apply 0.000s, num matches 1051
+    Rule (rule ((= e (Broadcast child l))        (has-type child ty))       ((has-type e ...: search 0.001s, apply 0.000s, num matches 2567
+    Rule (rule ((= e (IntImm bits i64)))       ((has-type e (Int bits 1)))          ): search 0.000s, apply 0.000s, num matches 137
+    Rule (rule ((= e (Bop (Add) (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= bc (Broadcast e lo))        (has-type e t)        (= p (LanesInType t)...: search 0.000s, apply 0.000s, num matches 1030
+    Rule (rule ((= rewrite_var__ (WithLanes (UInt i l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Mem2WMMA e)))       ((union rewrite_var__ (Loc2Loc (Mem...: search 0.000s, apply 0.000s, num matches 22
+    Rule (rule ((= rewrite_var__ (IntImm 32 x)))       ((union rewrite_var__ (IntImm32 x)...: search 0.000s, apply 0.000s, num matches 47
+    Rule (rule ((= e (IntImm _bits _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 47
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp base stride r-lanes) (Broadcast x ...: search 0.001s, apply 0.000s, num matches 2962
+    Rule (rule ((= rewrite_var__ (Mem2AMX e)))       ((union rewrite_var__ (Loc2Loc (Mem)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ()       ((CommBop (Add))        (CommBop (Mul))        (CommBop (And))   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Add) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 64
+    Rule (rule ((= e (Ramp child s l))        (has-type child ty))       ((has-type e (Mu...: search 0.001s, apply 0.000s, num matches 2986
+    Rule (rule ((= e (Bop bop e1 e2))        (has-type e1 t)        (has-type e2 t))     ...: search 0.002s, apply 0.000s, num matches 5233
+    Ruleset typechecking: search 0.006s, apply 0.000s, rebuild 0.001s
+    Ruleset : search 0.016s, apply 0.002s, rebuild 0.000s
+    
+[INFO ] Rebuild before command:          0ms
+[INFO ] Ran schedule (seq (saturate (seq (saturate (seq (run typechecking))) (run push-down-vector-reduce)))).
+[INFO ] Report: Rule (rule ((= rewrite_var__ (MultipliedLanes (Int i l) x)))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 70
+    Rule (rule ((remove-innermost-bc-demand e)        (= e (Load ty x e1))        (remove...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (Int i l) x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-innermost-bc-demand (Cast ty e)))       ((remove-innermost-bc-dem...: search 0.000s, apply 0.000s, num matches 17
+    Rule (rule ((= e (Ramp child s l))        (has-type child ty))       ((has-type e (Mu...: search 0.000s, apply 0.000s, num matches 1316
+    Rule (rule ((VectorReduce ty (Add) (Bop (Mul) a b)))       ((remove-innermost-bc-dema...: search 0.000s, apply 0.000s, num matches 14
+    Rule (rule ((= e (Select cond tval fval))        (has-type cond (UInt 1 _lanes))     ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Int i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 28
+    Rule (rule ((= rewrite_var__ (WithLanes (Handle l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Reinterpret ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce ty BinOp Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 7
+    Rule (rule ((remove-innermost-bc-demand (Load ty x e)))       ((remove-innermost-bc-d...: search 0.000s, apply 0.000s, num matches 14
+    Rule (rule ((remove-innermost-bc-demand (Broadcast e l))        (has-type e ty)      ...: search 0.000s, apply 0.000s, num matches 67
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Float i l) x)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 63
+    Rule (rule ((= e (Load ty name child)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 42
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (UInt i l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (BFloat i l) x)))       ((union rewrite_var__...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Uop uop e1))        (has-type e1 t))       ((has-type e t))        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (UInt i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Bop bop e1 e2))        (has-type e1 t)        (has-type e2 t))     ...: search 0.001s, apply 0.000s, num matches 2254
+    Rule (rule ((remove-innermost-bc-demand e)        (= e (Ramp e1 (Broadcast s ml) l)) ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Let x e1 e2)))       ((panic "let not supported"))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Loc2Loc l1 l2 e1))        (has-type e1 t))       ((has-type e t))  ...: search 0.000s, apply 0.000s, num matches 35
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Handle l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 7
+    Rule (rule ((= e (IntImm bits i64)))       ((has-type e (Int bits 1)))          ): search 0.000s, apply 0.000s, num matches 35
+    Rule (rule ((= e (Broadcast child l))        (has-type child ty))       ((has-type e ...: search 0.000s, apply 0.000s, num matches 1148
+    Rule (rule ((= e (Var ty x)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 140
+    Rule (rule ((= t (Float i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 42
+    Rule (rule ((remove-innermost-bc-demand (Ramp e s l))        (!= l 1))       ((remove...: search 0.000s, apply 0.000s, num matches 11
+    Rule (rule ((= e (BroadcastPer p e1 l))        (has-type e1 t))       ((has-type e (M...: search 0.000s, apply 0.000s, num matches 1148
+    Rule (rule ((= rewrite_var__ (WithLanes (Float i l) x)))       ((union rewrite_var__ ...: search 0.000s, apply 0.000s, num matches 28
+    Rule (rule ((= rewrite_var__ (WithLanes (UInt i l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-innermost-bc-demand e)        (= e (Broadcast e1 l))        (remo...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (BFloat i l) x)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (UIntImm bits i64)))       ((has-type e (UInt bits 1)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (BFloat i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce ty (Add) (Bop (Mul) a b)))        (remove-innermost-bc...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle VecExpr VecInt)))       ((panic "not supported"))          ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-innermost-bc-demand (Broadcast e l))        (has-type e ty)      ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Call fn out-type args)))       ((has-type e out-type))          ): search 0.000s, apply 0.000s, num matches 28
+    Rule (rule ((= e (FloatImm bits f64)))       ((has-type e (Float bits 1)))          ): search 0.000s, apply 0.000s, num matches 7
+    Rule (rule ((= t (Handle l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 7
+    Rule (rule ((= e (Cast ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 35
+    Rule (rule ((remove-innermost-bc-demand e)        (= e (Cast ty e1))        (remove-i...: search 0.000s, apply 0.000s, num matches 0
+    Ruleset typechecking: search 0.002s, apply 0.000s, rebuild 0.000s
+    Ruleset push-down-vector-reduce: search 0.000s, apply 0.000s, rebuild 0.000s
+    
+[INFO ] Ran schedule (seq (repeat 15 (seq (saturate (seq (run typechecking))) (repeat 1 (seq (run)))))).
+[INFO ] Report: Rule (rule ((= e (Select cond tval fval))        (has-type cond (UInt 1 _lanes))     ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAShape e rows cols)        (Store name e index))       ((WMMAAllocati...: search 0.000s, apply 0.000s, num matches 18
+    Rule (rule ((= e (Ramp child s l))        (has-type child ty))       ((has-type e (Mu...: search 0.001s, apply 0.000s, num matches 1447
+    Rule (rule ((= e (Select _expr1 _expr2 _expr3)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Min) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((has-type e t1)        (has-type e t2)        (!= t1 t2))       ((extract...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (Handle l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (BroadcastPer p a l) (BroadcastPer p b l))))   ...: search 0.000s, apply 0.000s, num matches 1183
+    Rule (rule ((= rewrite_var__ (Bop (LT) (IntImm bits a) (IntImm bits b)))        (>= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (AMX) (Mem) e)))       ((union rewrite_var__ (A...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Mem2WMMA (Broadcast (FloatImm 32 0.0) lanes)))        (WMMAShape e ...: search 0.000s, apply 0.000s, num matches 9
+    Rule (rule ((= rewrite_var__ (Bop (NE) (IntImm bits a) (IntImm bits b)))        (= a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Float i l) x)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 76
+    Rule (rule ((= e (Load ty name child)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 78
+    Rule (rule ((= rewrite_var__ (Loc2Loc a b (Loc2Loc b a e))))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Cast type expr) lanes)))       ((union ...: search 0.000s, apply 0.000s, num matches 12
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Bop bop a b) l)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 1181
+    Rule (rule ((= rewrite_var__ x)        (IsExpr x))       ((union rewrite_var__ (Broad...: search 0.000s, apply 0.000s, num matches 556
+    Rule (rule ((= e (Let x e1 e2)))       ((panic "let not supported"))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Float i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 104
+    Rule (rule ((= e (Var ty x)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 539
+    Rule (rule ((= rewrite_var__ (IntImm16 x)))       ((union rewrite_var__ (IntImm 16 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm 16 x)))       ((union rewrite_var__ (IntImm16 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Broadcast b l2)))        (< l...: search 0.000s, apply 0.000s, num matches 41
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (BFloat i l) x)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (UIntImm bits i64)))       ((has-type e (UInt bits 1)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (Ramp x s l2) (Broadcast a l1)))        (> l1 l...: search 0.001s, apply 0.000s, num matches 41
+    Rule (rule ((= rewrite_var__ (Bop (LE) (IntImm bits a) (IntImm bits b)))        (> a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (UIntOrIntImm false b x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= s (Store store-name (WMMA2Mem tile) index))        (= index (Ramp (Ram...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (VectorReduce t-outer bop (Cast t-inner e)))        (has...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mul) (Ramp b s l) (Broadcast x l))))       ((union...: search 0.000s, apply 0.000s, num matches 344
+    Rule (rule ((= rewrite_var__ (Broadcast (Broadcast x l0) l1)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 509
+    Rule (rule ((= bcp (BroadcastPer p e lo))        (has-type e t)        (= p (LanesInT...: search 0.000s, apply 0.000s, num matches 464
+    Rule (rule ((= rewrite_var__ (Loc2Loc (Mem) (WMMA) e)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 8
+    Rule (rule ((= rewrite_var__ (UIntOrInt true i l)))       ((union rewrite_var__ (Int ...: search 0.000s, apply 0.000s, num matches 15
+    Rule (rule ((= e (Load _type _string _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 27
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Broadcast x l0) l1))        (has-type x...: search 0.000s, apply 0.000s, num matches 436
+    Rule (rule ((= e (Reinterpret ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce ty BinOp Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAAllocation name rows cols)        (Store name e index))       ((WMMA...: search 0.000s, apply 0.000s, num matches 18
+    Rule (rule ((= rewrite_var__ (BroadcastPer p x 1)))       ((union rewrite_var__ x))  ...: search 0.000s, apply 0.000s, num matches 441
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (UInt i l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (BFloat i l) x)))       ((union rewrite_var__...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GE) (IntImm bits a) (IntImm bits b)))        (< a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm b x)))       ((union rewrite_var__ (UIntOrIntImm...: search 0.000s, apply 0.000s, num matches 40
+    Rule (rule ((= rewrite_var__ (AMX2Mem e)))       ((union rewrite_var__ (Loc2Loc (AMX)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp b1 s1 l) (Ramp b2 s2 l)))        (...: search 0.001s, apply 0.000s, num matches 1859
+    Rule (rule ((= rewrite_var__ (Bop (EQ) (IntImm bits a) (IntImm bits b)))        (= a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Handle l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 13
+    Rule (rule ((= e (Loc2Loc l1 l2 e1))        (has-type e1 t))       ((has-type e t))  ...: search 0.000s, apply 0.000s, num matches 20
+    Rule (rule ((= rewrite_var__ (UInt i l)))       ((union rewrite_var__ (UIntOrInt fals...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle _vecexpr _vecint)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Broadcast x l0) l1))        (has-type x...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ x)        (IsExpr x)        (has-type x (Int b l)))     ...: search 0.000s, apply 0.000s, num matches 446
+    Rule (rule ((= t (BFloat i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ()       ((AddOrSub (Add))        (AddOrSub (Sub)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Broadcast (Load type name index) lanes)))       ((union...: search 0.000s, apply 0.000s, num matches 21
+    Rule (rule ((= e (Call fn out-type args)))       ((has-type e out-type))          ): search 0.000s, apply 0.000s, num matches 123
+    Rule (rule ((= e (FloatImm bits f64)))       ((has-type e (Float bits 1)))          ): search 0.000s, apply 0.000s, num matches 26
+    Rule (rule ((= rewrite_var__ (Bop (Max) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (LT) (IntImm bits a) (IntImm bits b)))        (< a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mod) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Sub) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 6
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1))   ...: search 0.000s, apply 0.000s, num matches 582
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Int i l) x)))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 43
+    Rule (rule ((= rewrite_var__ (Bop (GE) (IntImm bits a) (IntImm bits b)))        (>= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm64 x)))       ((union rewrite_var__ (IntImm 64 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Cast _type _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 18
+    Rule (rule ((= rewrite_var__ (UIntOrInt false i l)))       ((union rewrite_var__ (UIn...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm32 x)))       ((union rewrite_var__ (IntImm 32 x)...: search 0.000s, apply 0.000s, num matches 45
+    Rule (rule ((= e (Ramp _expr1 _expr2 _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 753
+    Rule (rule ((= e (Let _string _expr1 _expr2)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Div) (Ramp (IntImm bits base) (IntImm bits 1) lane...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Uop uop e1))        (has-type e1 t))       ((has-type e t))        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Reinterpret _type _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mul) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 31
+    Rule (rule ((= rewrite_var__ (Bop (LE) (IntImm bits a) (IntImm bits b)))        (<= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GT) (IntImm bits a) (IntImm bits b)))        (> a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (WMMA) (Mem) e)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (UIntImm b x)))       ((union rewrite_var__ (UIntOrIntIm...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Broadcast _expr _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 502
+    Rule (rule ((= rewrite_var__ (Bop (NE) (IntImm bits a) (IntImm bits b)))        (!= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GT) (IntImm bits a) (IntImm bits b)))        (<= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (BroadcastPer p e1 l))        (has-type e1 t))       ((has-type e (M...: search 0.000s, apply 0.000s, num matches 844
+    Rule (rule ((= rewrite_var__ (WithLanes (Float i l) x)))       ((union rewrite_var__ ...: search 0.000s, apply 0.000s, num matches 9
+    Rule (rule ((= rewrite_var__ (Int i l)))       ((union rewrite_var__ (UIntOrInt true ...: search 0.000s, apply 0.000s, num matches 17
+    Rule (rule ((= rewrite_var__ (UIntOrIntImm true b x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 35
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp base stride lanes) (Broadcast x la...: search 0.000s, apply 0.000s, num matches 1409
+    Rule (rule ((= rewrite_var__ (Bop (Mod) (Ramp (IntImm bits base) (IntImm bits 1) lane...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle VecExpr VecInt)))       ((panic "not supported"))          ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAAllocation name rows cols)        (= e (Var t (V name))))       ((WM...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Handle l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 26
+    Rule (rule ((= e (Cast ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 54
+    Rule (rule ((= e (Bop BinOp _expr1 _expr2)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 1323
+    Rule (rule ((= rewrite_var__ (Bop bop a b))        (CommBop bop))       ((union rewri...: search 0.000s, apply 0.000s, num matches 1257
+    Rule (rule ((= rewrite_var__ (WithLanes (Int i l) x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (Mem) (AMX) e)))       ((union rewrite_var__ (M...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm 64 x)))       ((union rewrite_var__ (IntImm64 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Broadcast x 1)))       ((union rewrite_var__ x))       ...: search 0.000s, apply 0.000s, num matches 480
+    Rule (rule ((= rewrite_var__ (Broadcast (Cast type expr) lanes)))       ((union rewri...: search 0.000s, apply 0.000s, num matches 14
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1))   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (EQ) (IntImm bits a) (IntImm bits b)))        (!= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Int i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 42
+    Rule (rule ((= rewrite_var__ (WMMA2Mem e)))       ((union rewrite_var__ (Loc2Loc (WMM...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Var _type _string)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 188
+    Rule (rule ((= rewrite_var__ (Cast type (BroadcastPer p x l)))        (has-type x t) ...: search 0.000s, apply 0.000s, num matches 12
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Ramp x s l2)))        (> l1 l...: search 0.001s, apply 0.000s, num matches 40
+    Rule (rule ((has-type e (UIntOrInt sign bits lanes)))       ((union e (Bop (Add) e (B...: search 0.000s, apply 0.000s, num matches 510
+    Rule (rule ((= t (UInt i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Bop bop e1 e2))        (has-type e1 t)        (has-type e2 t))     ...: search 0.001s, apply 0.000s, num matches 2579
+    Rule (rule ((= e (VectorReduce _type _binop _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Call _string _type _vecexpr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 44
+    Rule (rule ((= rewrite_var__ (Bop (Div) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Ramp x s 1)))       ((union rewrite_var__ x))          ...: search 0.000s, apply 0.000s, num matches 744
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Load type name index) lanes)))       ((...: search 0.000s, apply 0.000s, num matches 18
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Broadcast b l2)))        (> l...: search 0.000s, apply 0.000s, num matches 40
+    Rule (rule ((= e (Broadcast child l))        (has-type child ty))       ((has-type e ...: search 0.000s, apply 0.000s, num matches 1030
+    Rule (rule ((= e (IntImm bits i64)))       ((has-type e (Int bits 1)))          ): search 0.000s, apply 0.000s, num matches 95
+    Rule (rule ((= e (Bop (Add) (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= bc (Broadcast e lo))        (has-type e t)        (= p (LanesInType t)...: search 0.000s, apply 0.000s, num matches 502
+    Rule (rule ((= rewrite_var__ (WithLanes (UInt i l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Mem2WMMA e)))       ((union rewrite_var__ (Loc2Loc (Mem...: search 0.000s, apply 0.000s, num matches 9
+    Rule (rule ((= rewrite_var__ (IntImm 32 x)))       ((union rewrite_var__ (IntImm32 x)...: search 0.000s, apply 0.000s, num matches 40
+    Rule (rule ((= e (IntImm _bits _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 40
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp base stride r-lanes) (Broadcast x ...: search 0.000s, apply 0.000s, num matches 1436
+    Rule (rule ((= rewrite_var__ (Mem2AMX e)))       ((union rewrite_var__ (Loc2Loc (Mem)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ()       ((CommBop (Add))        (CommBop (Mul))        (CommBop (And))   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Add) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 54
+    Ruleset typechecking: search 0.003s, apply 0.000s, rebuild 0.000s
+    Ruleset : search 0.009s, apply 0.001s, rebuild 0.000s
+    
+[INFO ] Ran schedule (seq (repeat 20 (seq (saturate (seq (run typechecking))) (repeat 1 (seq (run canonicalize)))))).
+[INFO ] Report: Rule (rule ((= rewrite_var__ (MultipliedLanes (Int i l) x)))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (WithLanes (Int i l) x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Ramp child s l))        (has-type child ty))       ((has-type e (Mu...: search 0.000s, apply 0.000s, num matches 140
+    Rule (rule ((= e (Select cond tval fval))        (has-type cond (UInt 1 _lanes))     ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-aligned-bc origin modified left right))       ((remove-aligned-bc...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Int i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (WithLanes (Handle l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Reinterpret ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce ty BinOp Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((make-aligned (Ramp e1 s1 l) (Ramp e2 s2 l)))       ((make-aligned e1 e2)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Float i l) x)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (Load ty name child)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (UInt i l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (BFloat i l) x)))       ((union rewrite_var__...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Uop uop e1))        (has-type e1 t))       ((has-type e t))        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (UInt i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Bop bop e1 e2))        (has-type e1 t)        (has-type e2 t))     ...: search 0.000s, apply 0.000s, num matches 226
+    Rule (rule ((make-aligned (Broadcast e1 b) (Broadcast e2 b)))       ((make-aligned e1...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Let x e1 e2)))       ((panic "let not supported"))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Loc2Loc l1 l2 e1))        (has-type e1 t))       ((has-type e t))  ...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Handle l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((make-aligned (Ramp e1 s1 l1) (Broadcast e2 b2))        (< l1 b2)        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (IntImm bits i64)))       ((has-type e (Int bits 1)))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (Broadcast child l))        (has-type child ty))       ((has-type e ...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= e (Var ty x)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 21
+    Rule (rule ((= t (Float i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 4
+    Rule (rule ((make-aligned (Ramp e1 s1 l1) (Ramp e2 s2 l2))        (< l1 l2)        (=...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (BroadcastPer p e1 l))        (has-type e1 t))       ((has-type e (M...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= rewrite_var__ (WithLanes (Float i l) x)))       ((union rewrite_var__ ...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (WithLanes (UInt i l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((make-aligned (Broadcast e1 b1) (Broadcast e2 b2))        (< b1 b2)      ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (UIntImm bits i64)))       ((has-type e (UInt bits 1)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (BFloat i l) x)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (BFloat i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((make-aligned a b))       ((make-aligned b a))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast (Float 32 ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle VecExpr VecInt)))       ((panic "not supported"))          ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce (UIntOrInt signed 32 out-lanes) (Add) (Bop (Mul) (Cast...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((remove-aligned-bc-impl origin modified left right inv-left inv-right)   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Call fn out-type args)))       ((has-type e out-type))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((make-aligned (Broadcast e1 b1) (Ramp e2 s2 l2))        (< b1 l2)        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Handle l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((make-aligned (Ramp e1 s1 l) (Broadcast e2 l)))       ((make-aligned e1 e...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Cast ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= e (FloatImm bits f64)))       ((has-type e (Float bits 1)))          ): search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= e (VectorReduce (UIntOrInt signed 32 out-lanes) (Add) (Bop (Mul) (Cast...: search 0.000s, apply 0.000s, num matches 0
+    Ruleset typechecking: search 0.000s, apply 0.000s, rebuild 0.000s
+    Ruleset canonicalize: search 0.000s, apply 0.000s, rebuild 0.000s
+    
+[INFO ] Ran schedule (seq (saturate (seq (saturate (seq (run typechecking))) (repeat 1 (seq (run assemble)))))).
+[INFO ] Report: Rule (rule ((= rewrite_var__ (MultipliedLanes (Int i l) x)))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (WithLanes (Int i l) x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Select cond tval fval))        (has-type cond (UInt 1 _lanes))     ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Ramp child s l))        (has-type child ty))       ((has-type e (Mu...: search 0.000s, apply 0.000s, num matches 140
+    Rule (rule ((= t (Int i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (WithLanes (Handle l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Reinterpret ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce ty BinOp Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (assemble-inv-ind m e (InvertedIndexEnd))))       ((unio...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (matrix-multiplication-int/uint-cont signed lhs-name rhs...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (matrix-multiplication-float-cont lhs-name rhs-name old-...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Float i l) x)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (Load ty name child)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (UInt i l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (BFloat i l) x)))       ((union rewrite_var__...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Uop uop e1))        (has-type e1 t))       ((has-type e t))        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (UInt i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Bop bop e1 e2))        (has-type e1 t)        (has-type e2 t))     ...: search 0.000s, apply 0.000s, num matches 226
+    Rule (rule ((= e (Let x e1 e2)))       ((panic "let not supported"))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Loc2Loc l1 l2 e1))        (has-type e1 t))       ((has-type e t))  ...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Handle l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= e (Broadcast child l))        (has-type child ty))       ((has-type e ...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= e (IntImm bits i64)))       ((has-type e (Int bits 1)))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= t (Float i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 4
+    Rule (rule ((= e (Var ty x)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 21
+    Rule (rule ((= e (BroadcastPer p e1 l))        (has-type e1 t))       ((has-type e (M...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= rewrite_var__ (WithLanes (Float i l) x)))       ((union rewrite_var__ ...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (WithLanes (UInt i l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (assemble-inv-ind m e (InvRamp i (Broadcast s sl) l)))  ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (assemble-inv-ind m e (InvBroadcast i l))))       ((unio...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (BFloat i l) x)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (BFloat i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (UIntImm bits i64)))       ((has-type e (UInt bits 1)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle VecExpr VecInt)))       ((panic "not supported"))          ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Call fn out-type args)))       ((has-type e out-type))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (FloatImm bits f64)))       ((has-type e (Float bits 1)))          ): search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= t (Handle l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= e (Cast ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 2
+    Ruleset assemble: search 0.000s, apply 0.000s, rebuild 0.000s
+    Ruleset typechecking: search 0.000s, apply 0.000s, rebuild 0.000s
+    
+[INFO ] Ran schedule (seq (repeat 12 (seq (saturate (seq (run typechecking))) (repeat 1 (seq (run)))))).
+[INFO ] Report: Rule (rule ((= e (Select cond tval fval))        (has-type cond (UInt 1 _lanes))     ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAShape e rows cols)        (Store name e index))       ((WMMAAllocati...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= e (Ramp child s l))        (has-type child ty))       ((has-type e (Mu...: search 0.000s, apply 0.000s, num matches 140
+    Rule (rule ((= e (Select _expr1 _expr2 _expr3)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Min) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((has-type e t1)        (has-type e t2)        (!= t1 t2))       ((extract...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (Handle l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (BroadcastPer p a l) (BroadcastPer p b l))))   ...: search 0.000s, apply 0.000s, num matches 241
+    Rule (rule ((= rewrite_var__ (Bop (LT) (IntImm bits a) (IntImm bits b)))        (>= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (AMX) (Mem) e)))       ((union rewrite_var__ (A...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Mem2WMMA (Broadcast (FloatImm 32 0.0) lanes)))        (WMMAShape e ...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (Bop (NE) (IntImm bits a) (IntImm bits b)))        (= a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Float i l) x)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (Load ty name child)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (Loc2Loc a b (Loc2Loc b a e))))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Cast type expr) lanes)))       ((union ...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Bop bop a b) l)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 241
+    Rule (rule ((= rewrite_var__ x)        (IsExpr x))       ((union rewrite_var__ (Broad...: search 0.000s, apply 0.000s, num matches 83
+    Rule (rule ((= e (Let x e1 e2)))       ((panic "let not supported"))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Float i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 4
+    Rule (rule ((= e (Var ty x)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 21
+    Rule (rule ((= rewrite_var__ (IntImm16 x)))       ((union rewrite_var__ (IntImm 16 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm 16 x)))       ((union rewrite_var__ (IntImm16 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Broadcast b l2)))        (< l...: search 0.000s, apply 0.000s, num matches 16
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (BFloat i l) x)))       ((union rewrite...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (UIntImm bits i64)))       ((has-type e (UInt bits 1)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop bop (Ramp x s l2) (Broadcast a l1)))        (> l1 l...: search 0.000s, apply 0.000s, num matches 16
+    Rule (rule ((= rewrite_var__ (Bop (LE) (IntImm bits a) (IntImm bits b)))        (> a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (UIntOrIntImm false b x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= s (Store store-name (WMMA2Mem tile) index))        (= index (Ramp (Ram...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (VectorReduce t-outer bop (Cast t-inner e)))        (has...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mul) (Ramp b s l) (Broadcast x l))))       ((union...: search 0.000s, apply 0.000s, num matches 70
+    Rule (rule ((= rewrite_var__ (Broadcast (Broadcast x l0) l1)))       ((union rewrite_...: search 0.000s, apply 0.000s, num matches 92
+    Rule (rule ((= bcp (BroadcastPer p e lo))        (has-type e t)        (= p (LanesInT...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= rewrite_var__ (Loc2Loc (Mem) (WMMA) e)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (UIntOrInt true i l)))       ((union rewrite_var__ (Int ...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= e (Load _type _string _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Broadcast x l0) l1))        (has-type x...: search 0.000s, apply 0.000s, num matches 87
+    Rule (rule ((= e (Reinterpret ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (VectorReduce ty BinOp Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAAllocation name rows cols)        (Store name e index))       ((WMMA...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (BroadcastPer p x 1)))       ((union rewrite_var__ x))  ...: search 0.000s, apply 0.000s, num matches 83
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (UInt i l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (WithLanes (BFloat i l) x)))       ((union rewrite_var__...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GE) (IntImm bits a) (IntImm bits b)))        (< a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm b x)))       ((union rewrite_var__ (UIntOrIntImm...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= rewrite_var__ (AMX2Mem e)))       ((union rewrite_var__ (Loc2Loc (AMX)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp b1 s1 l) (Ramp b2 s2 l)))        (...: search 0.000s, apply 0.000s, num matches 352
+    Rule (rule ((= rewrite_var__ (Bop (EQ) (IntImm bits a) (IntImm bits b)))        (= a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Handle l) x)))       ((union rewrite_v...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= e (Loc2Loc l1 l2 e1))        (has-type e1 t))       ((has-type e t))  ...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (UInt i l)))       ((union rewrite_var__ (UIntOrInt fals...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle _vecexpr _vecint)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Broadcast x l0) l1))        (has-type x...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ x)        (IsExpr x)        (has-type x (Int b l)))     ...: search 0.000s, apply 0.000s, num matches 69
+    Rule (rule ((= t (BFloat i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ()       ((AddOrSub (Add))        (AddOrSub (Sub)))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Broadcast (Load type name index) lanes)))       ((union...: search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= e (Call fn out-type args)))       ((has-type e out-type))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (FloatImm bits f64)))       ((has-type e (Float bits 1)))          ): search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (Bop (Max) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (LT) (IntImm bits a) (IntImm bits b)))        (< a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mod) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Sub) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1))   ...: search 0.000s, apply 0.000s, num matches 143
+    Rule (rule ((= rewrite_var__ (MultipliedLanes (Int i l) x)))       ((union rewrite_va...: search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (Bop (GE) (IntImm bits a) (IntImm bits b)))        (>= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm64 x)))       ((union rewrite_var__ (IntImm 64 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Cast _type _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (UIntOrInt false i l)))       ((union rewrite_var__ (UIn...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm32 x)))       ((union rewrite_var__ (IntImm 32 x)...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (Ramp _expr1 _expr2 _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 140
+    Rule (rule ((= e (Let _string _expr1 _expr2)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Div) (Ramp (IntImm bits base) (IntImm bits 1) lane...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Uop uop e1))        (has-type e1 t))       ((has-type e t))        ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Reinterpret _type _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Mul) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 7
+    Rule (rule ((= rewrite_var__ (Bop (LE) (IntImm bits a) (IntImm bits b)))        (<= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GT) (IntImm bits a) (IntImm bits b)))        (> a ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (WMMA) (Mem) e)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (UIntImm b x)))       ((union rewrite_var__ (UIntOrIntIm...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Broadcast _expr _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= rewrite_var__ (Bop (NE) (IntImm bits a) (IntImm bits b)))        (!= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (GT) (IntImm bits a) (IntImm bits b)))        (<= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (BroadcastPer p e1 l))        (has-type e1 t))       ((has-type e (M...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= rewrite_var__ (WithLanes (Float i l) x)))       ((union rewrite_var__ ...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (Int i l)))       ((union rewrite_var__ (UIntOrInt true ...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (UIntOrIntImm true b x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp base stride lanes) (Broadcast x la...: search 0.000s, apply 0.000s, num matches 261
+    Rule (rule ((= rewrite_var__ (Bop (Mod) (Ramp (IntImm bits base) (IntImm bits 1) lane...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Shuffle VecExpr VecInt)))       ((panic "not supported"))          ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((WMMAAllocation name rows cols)        (= e (Var t (V name))))       ((WM...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Handle l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= e (Cast ty Expr)))       ((has-type e ty))          ): search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= e (Bop BinOp _expr1 _expr2)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 226
+    Rule (rule ((= rewrite_var__ (Bop bop a b))        (CommBop bop))       ((union rewri...: search 0.000s, apply 0.000s, num matches 216
+    Rule (rule ((= rewrite_var__ (WithLanes (Int i l) x)))       ((union rewrite_var__ (I...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Loc2Loc (Mem) (AMX) e)))       ((union rewrite_var__ (M...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (IntImm 64 x)))       ((union rewrite_var__ (IntImm64 x)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Broadcast x 1)))       ((union rewrite_var__ x))       ...: search 0.000s, apply 0.000s, num matches 83
+    Rule (rule ((= rewrite_var__ (Broadcast (Cast type expr) lanes)))       ((union rewri...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Ramp x (Broadcast s curr-p) l0) l1))   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (EQ) (IntImm bits a) (IntImm bits b)))        (!= a...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= t (Int i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (WMMA2Mem e)))       ((union rewrite_var__ (Loc2Loc (WMM...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Var _type _string)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 21
+    Rule (rule ((= rewrite_var__ (Cast type (BroadcastPer p x l)))        (has-type x t) ...: search 0.000s, apply 0.000s, num matches 2
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Ramp x s l2)))        (> l1 l...: search 0.000s, apply 0.000s, num matches 16
+    Rule (rule ((has-type e (UIntOrInt sign bits lanes)))       ((union e (Bop (Add) e (B...: search 0.000s, apply 0.000s, num matches 69
+    Rule (rule ((= t (UInt i l)))       ((set (LanesInType t) l))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Bop bop e1 e2))        (has-type e1 t)        (has-type e2 t))     ...: search 0.000s, apply 0.000s, num matches 226
+    Rule (rule ((= e (VectorReduce _type _binop _expr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= e (Call _string _type _vecexpr)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= rewrite_var__ (Bop (Div) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Ramp x s 1)))       ((union rewrite_var__ x))          ...: search 0.000s, apply 0.000s, num matches 139
+    Rule (rule ((= rewrite_var__ (BroadcastPer p (Load type name index) lanes)))       ((...: search 0.000s, apply 0.000s, num matches 3
+    Rule (rule ((= rewrite_var__ (Bop bop (Broadcast a l1) (Broadcast b l2)))        (> l...: search 0.000s, apply 0.000s, num matches 16
+    Rule (rule ((= e (Broadcast child l))        (has-type child ty))       ((has-type e ...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= e (IntImm bits i64)))       ((has-type e (Int bits 1)))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (Bop (Add) (VectorReduce (Float 32 out-lanes) (Add) (Bop (Mul) (Cast...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= bc (Broadcast e lo))        (has-type e t)        (= p (LanesInType t)...: search 0.000s, apply 0.000s, num matches 88
+    Rule (rule ((= rewrite_var__ (WithLanes (UInt i l) x)))       ((union rewrite_var__ (...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Mem2WMMA e)))       ((union rewrite_var__ (Loc2Loc (Mem...: search 0.000s, apply 0.000s, num matches 1
+    Rule (rule ((= rewrite_var__ (IntImm 32 x)))       ((union rewrite_var__ (IntImm32 x)...: search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= e (IntImm _bits _i64)))       ((IsExpr e))          ): search 0.000s, apply 0.000s, num matches 5
+    Rule (rule ((= rewrite_var__ (Bop add-or-sub (Ramp base stride r-lanes) (Broadcast x ...: search 0.000s, apply 0.000s, num matches 270
+    Rule (rule ((= rewrite_var__ (Mem2AMX e)))       ((union rewrite_var__ (Loc2Loc (Mem)...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ()       ((CommBop (Add))        (CommBop (Mul))        (CommBop (And))   ...: search 0.000s, apply 0.000s, num matches 0
+    Rule (rule ((= rewrite_var__ (Bop (Add) (IntImm bits a) (IntImm bits b))))       ((un...: search 0.000s, apply 0.000s, num matches 9
+    Ruleset typechecking: search 0.000s, apply 0.000s, rebuild 0.000s
+    Ruleset : search 0.002s, apply 0.000s, rebuild 0.000s
+    
+[INFO ] Declared ruleset subsume-invalid-exprs.
+[INFO ] extracted with cost 76: (Store "A" (Cast (Float 16 1) (Load (Float 32 1) (V "lhs") (Bop (Add) (Bop (Sub) (Bop (Mul) (Bop (Sub) (Bop (Add) (Var (Int 32 1) (V "A.s0.y.rebased")) (Var (Int 32 1) (V "matmul_global_wrapper$0.min.1"))) (Var (Int 32 1) (V "lhs.min.1"))) (Var (Int 32 1) (V "lhs.stride.1"))) (Var (Int 32 1) (V "lhs.min.0"))) (Var (Int 32 1) (V "A.s0.x"))))) (Bop (Add) (Bop (Mul) (Var (Int 32 1) (V "A.s0.y.rebased")) (IntImm32 4096)) (Var (Int 32 1) (V "A.s0.x"))))
+[INFO ] extracted with cost 80: (Store "B" (Cast (Float 16 1) (Load (Float 32 1) (V "rhs") (Bop (Add) (Bop (Sub) (Bop (Mul) (Bop (Sub) (Var (Int 32 1) (V "B.s0.y")) (Var (Int 32 1) (V "rhs.min.1"))) (Var (Int 32 1) (V "rhs.stride.1"))) (Var (Int 32 1) (V "rhs.min.0"))) (Bop (Add) (Var (Int 32 1) (V "B.s0.x.rebased")) (Var (Int 32 1) (V "matmul_global_wrapper$0.min.0")))))) (Bop (Add) (Bop (Mul) (Var (Int 32 1) (V "B.s0.y")) (Var (Int 32 1) (V "matmul_global_wrapper$0.extent.0"))) (Var (Int 32 1) (V "B.s0.x.rebased"))))
+[INFO ] extracted with cost 223: (Store "matmul" (Call "wmma.load.c.sync.aligned.row.m16n16k16.f16" (Float 32 256) (vec-of (Var (Handle 1) (ExprVar (Mem) (Broadcast (FloatImm 32 0.0) 256))) (IntImm32 16))) (Ramp (IntImm32 0) (IntImm32 1) 256))
+[INFO ] extracted with cost 299: (Store "matmul" (Call "wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32" (Float 32 256) (vec-of (Load (Float 32 256) (V "matmul") (Ramp (IntImm32 0) (IntImm32 1) 256)) (Call "wmma.load.a.sync.aligned.row.m16n16k16.f16" (Float 16 256) (vec-of (Var (Handle 1) (V "A")) (Bop (Add) (Bop (Mul) (Var (Int 32 1) (V "matmul.s1.acc$x.rro")) (IntImm32 16)) (Bop (Mul) (Var (Int 32 1) (V "matmul_global_wrapper$0.s0.y.mmyi.base.s")) (IntImm32 4096))) (IntImm32 4096))) (Call "wmma.load.b.sync.aligned.row.m16n16k16.f16" (Float 16 256) (vec-of (Var (Handle 1) (V "B")) (Bop (Add) (Bop (Mul) (Bop (Mul) (Var (Int 32 1) (V "matmul.s1.acc$x.rro")) (Var (Int 32 1) (V "matmul_global_wrapper$0.extent.0"))) (IntImm32 16)) (Var (Int 32 1) (V "matmul_global_wrapper$0.s0.x.mmxi.base.s"))) (Var (Int 32 1) (V "matmul_global_wrapper$0.extent.0")))))) (Ramp (IntImm32 0) (IntImm32 1) 256))
+[INFO ] extracted with cost 132: (Evaluate (Call "wmma.store.d.sync.aligned.row.m16n16k16.f32" (Int 32 1) (vec-of (Var (Handle 1) (V "matmul_global_wrapper$0")) (Load (Float 32 256) (V "matmul") (Ramp (IntImm32 0) (IntImm32 1) 256)) (Bop (Mul) (Var (Int 32 1) (V "matmul_global_wrapper$0.stride.1")) (IntImm32 4)))))

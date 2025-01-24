@@ -1,0 +1,185 @@
+; prog +=  R"***(
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Datatype declarations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(datatype Loc 
+    (Mem) ; This is where the generic computation happens
+    (AMX) ; AMX tiles
+    (WMMA) ; CUDA Warp-level Matrix Multiplication registers
+)
+
+(datatype BinOp
+    (Add)
+    (Sub)
+    (Mul)
+    (Div)
+    (Mod)
+    (Min)
+    (Max)
+    (EQ)
+    (NE)
+    (LT)
+    (LE)
+    (GT)
+    (GE)
+    (And)
+    (Or))
+(datatype UnaOp
+    (Not))
+
+; TODO
+(datatype Buffer)
+(datatype Parameter)
+(datatype Type
+    ;;  bits x lanes
+    (Int i64 i64)
+    (UInt i64 i64)
+    (Float i64 i64)
+    (BFloat i64 i64)
+    (Handle i64)
+)
+
+(sort Stmt)
+(sort VecInt (Vec i64))
+(sort Expr)
+(sort VecExpr (Vec Expr))
+
+(sort Variable)
+(function V (String) Variable)
+
+;; Expr
+(function Cast (Type Expr) Expr)
+(function Reinterpret (Type Expr) Expr)
+(function Bop (BinOp Expr Expr) Expr)
+(function Uop (UnaOp Expr) Expr)
+;; condition true_val false_val
+(function Select (Expr Expr Expr) Expr)
+;; name index
+(function Load (Type Variable Expr) Expr)
+;; base stride lanes
+(function Ramp (Expr Expr i64) Expr :cost 100)
+;; value lanes
+(function Broadcast (Expr i64) Expr :cost 100)
+;; name value body
+;; TODO: Not sure if we need this one, binding is tricky
+(function Let (String Expr Expr) Expr)
+;; This one is also tricky
+(function Call (String Type VecExpr) Expr)
+;; name
+;; TODO: there are some arguments that are ignored here
+(function Var (Type Variable) Expr)
+(function Shuffle (VecExpr VecInt) Expr)
+(function VectorReduce (Type BinOp Expr) Expr)
+;;                bits val
+(function IntImm (i64  i64) Expr)
+; u64 is not supported in egglog
+(function UIntImm (i64  i64) Expr)
+(function FloatImm (i64 f64) Expr)
+
+
+;; Stmt
+
+;;                name  value index
+(function Store (String Expr  Expr) Stmt)
+(function Evaluate (Expr) Stmt)
+
+
+;; Some secondary stmts that we may not use
+;; Not supported: Provide, Realize, Acquire, Prefetch, HoistedStorage
+
+;; TODO: MemoryType, ForType, Partition, DeviceAPI
+; (function LetStmt (String Expr Stmt) Stmt)
+; (function AssertStmt (Expr Expr) Stmt)
+; (function ProducerConsumer (String bool Stmt) Stmt)
+; ;;                 name    type mem_type   extents cond body 
+; (function Allocate (String Type MemoryType VecExpr Expr Stmt) Stmt)
+; (function Free (String) Stmt)
+; (function Block (Stmt Stmt) Stmt)
+; (function Fork (Stmt Stmt) Stmt)
+; (function IfThenElse (Expr Stmt Stmt) Stmt)
+; (function For (String Expr Expr ForType Partition DeviceAPI Stmt) Stmt)
+; (function Atomic (String String Stmt) Stmt)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Extensions to the IR
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(function Loc2Loc (Loc Loc Expr) Expr :unextractable)
+; (function Mem2AMX (Expr) Expr :unextractable)
+(function Mem2AMX (Expr) Expr :cost 100000)
+; (function AMX2Mem (Expr) Expr :unextractable)
+(function AMX2Mem (Expr) Expr :cost 100000)
+(function WMMA2Mem (Expr) Expr :cost 1000)
+(function Mem2WMMA (Expr) Expr :cost 1000)
+
+(birewrite (Mem2AMX e) (Loc2Loc (Mem) (AMX) e))
+(birewrite (AMX2Mem e) (Loc2Loc (AMX) (Mem) e))
+(birewrite (WMMA2Mem e) (Loc2Loc (WMMA) (Mem) e))
+(birewrite (Mem2WMMA e) (Loc2Loc (Mem) (WMMA) e))
+(rewrite (Loc2Loc a b (Loc2Loc b a e)) e)
+
+(function ExprVar (Loc Expr) Variable)
+;; See `optimization/vector_axioms.egg` for conversion between `Broadcast` and `BroadcastPer`
+(function BroadcastPer (i64 Expr i64) Expr :cost 200) ;; cost 200 to prioritize `Broadcast` over `BroadcastPer`
+
+;; list of intrinsics
+; KWayInterleave(i64 k, Expr base, i64 lanes): i64x(height*width)
+
+;; We don't need StoreAndLoad... Use ExprVar instead
+; ;; takes an expression over loc1, stores it in loc1, 
+; ;; and then loads it back in loc2
+; ;; There is actually no load happening here:
+; ;;       *StoreAndLoad returns the base address and by itself
+; ;;       it does not load the value
+; ;;       It may be better named as StoreAndReturnBaseAddress (This name is suggested by Copilot)
+; ;;       Or Spill
+; (function GenericStoreAndLoad (Loc Loc Expr) Expr)
+; ;; Takes a Mem expression, stores it in memory, and then loads it back
+; (function StoreAndLoad (Expr) Expr)
+; ;; takes an AMX expression, tile_store it in memory, 
+; ;; and then load this memory back
+; (function AMXStoreAndLoad (Expr) Expr)
+; (birewrite (AMXStoreAndLoad e) (GenericStoreAndLoad (AMX) (Mem) e))
+; (birewrite (StoreAndLoad e) (GenericStoreAndLoad (Mem) (Mem) e))
+
+
+;; This is for use with StoreAndLoad
+(function Computed () Expr)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Helpers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; true if the type is signed
+(function UIntOrInt (bool i64 i64) Type)
+(birewrite (UIntOrInt false i l) (UInt i l))
+(birewrite (UIntOrInt true i l) (Int i l))
+
+(function UIntOrIntImm (bool i64 i64) Expr)
+(birewrite (UIntOrIntImm false b x) (UIntImm b x))
+(birewrite (UIntOrIntImm true b x) (IntImm b x))
+
+(function IntImm64 (i64) Expr)
+(birewrite (IntImm64 x) (IntImm 64 x))
+(function IntImm32 (i64) Expr)
+(birewrite (IntImm32 x) (IntImm 32 x))
+(function IntImm16 (i64) Expr)
+(birewrite (IntImm16 x) (IntImm 16 x))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Constants
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Rulesets
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(ruleset amx)
+; (ruleset amx-alwaysrun)
+
+(ruleset canonicalize)
+(ruleset assemble)
+(ruleset typechecking)
+(ruleset push-down-vector-reduce)
+
+; )***"; prog += "\n";
+

@@ -96,7 +96,11 @@ void Closure::visit(const Allocate *op) {
 void Closure::visit(const Variable *op) {
     if (ignore.contains(op->name)) {
         debug(DBG) << "Not adding var " << op->name << " to closure\n";
-    } else {
+    } 
+    else if (op->type.is_handle()) {
+        found_buffer_ref(op->name, type_of<void *>(), true, true, Halide::Buffer<>());
+    } 
+    else {
         debug(DBG) << "Adding var " << op->name << " to closure\n";
         vars[op->name] = op->type;
     }

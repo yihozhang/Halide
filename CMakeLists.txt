@@ -251,6 +251,7 @@ add_subdirectory(tools)
 
 if (WITH_TESTS)
     add_subdirectory(test)
+    add_subdirectory(instrsel-benchmarks)
 endif ()
 
 if (WITH_PYTHON_BINDINGS)

@@ -1,0 +1,45 @@
+; prog +=  R"***(
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Properties
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(relation CommBop (BinOp))
+(rule () (
+    (CommBop (Add))
+    (CommBop (Mul))
+    (CommBop (And))
+    (CommBop (Or))
+    (CommBop (Min))
+    (CommBop (Max))
+    (CommBop (EQ))
+    (CommBop (NE))
+))
+
+(relation AddOrSub (BinOp))
+(rule () (
+    (AddOrSub (Add))
+    (AddOrSub (Sub))
+))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Analysis rules
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; IsExpr
+(relation IsExpr (Expr))
+(rule ((= e (Cast _type _expr))) ((IsExpr e)))
+(rule ((= e (Reinterpret _type _expr))) ((IsExpr e)))
+(rule ((= e (Bop BinOp _expr1 _expr2))) ((IsExpr e)))
+(rule ((= e (Select _expr1 _expr2 _expr3))) ((IsExpr e)))
+(rule ((= e (Load _type _string _expr))) ((IsExpr e)))
+(rule ((= e (Ramp _expr1 _expr2 _i64))) ((IsExpr e)))
+(rule ((= e (Broadcast _expr _i64))) ((IsExpr e)))
+(rule ((= e (Let _string _expr1 _expr2))) ((IsExpr e)))
+(rule ((= e (Call _string _type _vecexpr))) ((IsExpr e)))
+(rule ((= e (Var _type _string))) ((IsExpr e)))
+(rule ((= e (Shuffle _vecexpr _vecint))) ((IsExpr e)))
+(rule ((= e (VectorReduce _type _binop _expr))) ((IsExpr e)))
+(rule ((= e (IntImm _bits _i64))) ((IsExpr e)))
+
+; )***"; prog += "\n";

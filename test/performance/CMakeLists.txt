@@ -23,7 +23,9 @@ tests(GROUPS performance
       packed_planar_fusion.cpp
       realize_overhead.cpp
       rgb_interleaved.cpp
+      tiled_conv_with_swizzle.cpp
       tiled_matmul.cpp
+      tiled_matmul_with_swizzle.cpp
       vectorize.cpp
       wrap.cpp
       )

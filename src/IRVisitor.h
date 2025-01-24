@@ -77,6 +77,9 @@ protected:
     virtual void visit(const Acquire *);
     virtual void visit(const Atomic *);
     virtual void visit(const HoistedStorage *);
+    virtual bool is_base_ir_visitor() {
+        return true;
+    }
 };
 
 /** A base class for algorithms that walk recursively over the IR

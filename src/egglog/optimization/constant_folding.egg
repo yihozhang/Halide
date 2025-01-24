@@ -1,0 +1,28 @@
+; prog +=  R"***(
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Constant folding
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(rewrite (Bop (Add) (IntImm bits a) (IntImm bits b)) (IntImm bits (+ a b)))
+(rewrite (Bop (Sub) (IntImm bits a) (IntImm bits b)) (IntImm bits (- a b)))
+(rewrite (Bop (Mul) (IntImm bits a) (IntImm bits b)) (IntImm bits (* a b)))
+(rewrite (Bop (Div) (IntImm bits a) (IntImm bits b)) (IntImm bits (/ a b)))
+(rewrite (Bop (Mod) (IntImm bits a) (IntImm bits b)) (IntImm bits (% a b)))
+(rewrite (Bop (Min) (IntImm bits a) (IntImm bits b)) (IntImm bits (min a b)))
+(rewrite (Bop (Max) (IntImm bits a) (IntImm bits b)) (IntImm bits (max a b)))
+(rewrite (Bop (EQ) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((= a b)))
+(rewrite (Bop (EQ) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((!= a b)))
+(rewrite (Bop (NE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((= a b)))
+(rewrite (Bop (NE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((!= a b)))
+(rewrite (Bop (LT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((< a b)))
+(rewrite (Bop (LT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((>= a b)))
+(rewrite (Bop (LE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((<= a b)))
+(rewrite (Bop (LE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((> a b)))
+(rewrite (Bop (GT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((> a b)))
+(rewrite (Bop (GT) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((<= a b)))
+(rewrite (Bop (GE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 1) :when ((>= a b)))
+(rewrite (Bop (GE) (IntImm bits a) (IntImm bits b)) (UIntImm 1 0) :when ((< a b)))
+; TODO: logical operators
+
+; )***"; prog += "\n";

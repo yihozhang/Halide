@@ -1,0 +1,9 @@
+; prog +=  R"***(
+
+(rule (
+    (has-type e (UIntOrInt sign bits lanes))
+) (
+    (union e (Bop (Add) e (Broadcast (UIntOrIntImm sign bits 0) lanes)))
+))
+
+; )***"; prog += "\n";

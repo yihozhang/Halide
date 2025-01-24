@@ -100,6 +100,10 @@ protected:
     virtual Stmt visit(const Fork *);
     virtual Stmt visit(const Atomic *);
     virtual Stmt visit(const HoistedStorage *);
+
+    virtual bool is_base_ir_mutator() {
+        return true;
+    }
 };
 
 /** A mutator that caches and reapplies previously-done mutations, so

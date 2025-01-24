@@ -85,6 +85,8 @@ bool matmul(Halide::Target target) {
     // This means that the rows must always be divisible by 4 (or 2 for bf16).
     ImageParam B(rhs(8), 3, "rhs");
 
+    B.dim(1).set_stride(4);
+
     RDom r(0, acc);
 
     Func mm("matmul");
@@ -108,6 +110,7 @@ bool matmul(Halide::Target target) {
         .split(r.x, rro, rri, tile_r)
         // Reorder so that the (x,y) tile is inside the inner ro loop
         .reorder({rri, ryi, rxi, rro, y, x})
+        .unroll(rro)
         .atomic()
         .vectorize(rri)
         .vectorize(ryi)
@@ -142,11 +145,12 @@ bool matmul(Halide::Target target) {
     // Uncomment to check the asm
     // result.compile_to_llvm_assembly(Internal::get_test_tmp_dir() + "tiled_matmul.ll", {A, B}, target);
     // result.compile_to_assembly(Internal::get_test_tmp_dir() + "tiled_matmul.s", {A, B}, target);
+    result.compile_to_lowered_stmt("/tmp/tiled_matmul.html", {A, B}, HTML, target);
 
-    auto time = Tools::benchmark(20, 20, [&]() {
-        result.realize(out);
-    });
-    std::cout << "Exec time: " << time << "\n";
+    // auto time = Tools::benchmark(20, 20, [&]() {
+    //     result.realize(out);
+    // });
+    // std::cout << "Exec time: " << time << "\n";
     std::cout << "Success!\n";
     return true;
 }
@@ -171,6 +175,8 @@ bool matmul_bf16(Halide::Target target) {
     Var x("x"), y("y");
     ImageParam A(BFloat(16), 2, "lhs");
     ImageParam B(BFloat(16), 3, "rhs");
+
+    B.dim(1).set_stride(2);
 
     RDom r(0, acc, "acc");
 
@@ -223,19 +229,20 @@ bool matmul_bf16(Halide::Target target) {
 
     // Uncomment to check the asm
     // result.compile_to_llvm_assembly(Internal::get_test_tmp_dir() + "tiled_matmul_bf16.ll", {A, B}, target);
-    // result.compile_to_assembly(Internal::get_test_tmp_dir() + "tiled_matmul.s", {A, B}, target);
+    result.compile_to_assembly(Internal::get_test_tmp_dir() + "tiled_matmul.s", {A, B}, target);
 
-    auto time = Tools::benchmark(20, 20, [&]() {
-        result.realize(out);
-    });
-
-    std::cout << "Exec time: " << time << "\n";
+    // auto time = Tools::benchmark(20, 20, [&]() {
+    //     result.realize(out);
+    // });
+    //
+    // std::cout << "Exec time: " << time << "\n";
     std::cout << "Success!\n";
     return true;
 }
 
 int main(int argc, char **argv) {
-    Target target = get_jit_target_from_environment();
+    freopen("/tmp/tiled_matmul.log", "w", stderr);
+    Target target("x86-64-linux-avx512_sapphirerapids");
     if (!target.has_feature(Target::AVX512_SapphireRapids)) {
         std::cout << "[SKIP] The tiled matmul test is only designed to test AMX support.\n";
         return 0;
@@ -243,14 +250,14 @@ int main(int argc, char **argv) {
 
     printf("Running AMX (signed/signed)\n");
     matmul_ss(target);
-    printf("Running AMX (unsigned/signed)\n");
-    matmul_us(target);
-    printf("Running AMX (signed/unsigned)\n");
-    matmul_su(target);
-    printf("Running AMX (unsigned/unsigned)\n");
-    matmul_uu(target);
-
-    printf("Running AMX (bf16)\n");
-    matmul_bf16(target);
+    // printf("Running AMX (unsigned/signed)\n");
+    // matmul_us(target);
+    // printf("Running AMX (signed/unsigned)\n");
+    // matmul_su(target);
+    // printf("Running AMX (unsigned/unsigned)\n");
+    // matmul_uu(target);
+    //
+    // printf("Running AMX (bf16)\n");
+    // matmul_bf16(target);
     return 0;
 }

@@ -1,0 +1,14 @@
+(include "definition.egg")
+(include "analysis/common.egg")
+(include "analysis/typechecking.egg")
+(include "optimization/vector_axioms.egg")
+(include "optimization/arithmetic_axioms.egg")
+(include "optimization/constant_folding.egg")
+(include "optimization/index_tweaking.egg")
+(include "accelerator/amx.egg")
+(include "accelerator/cuda_wmma.egg")
+
+(include "INPUT")
+
+; The schedule is imported by run_egglog.sh
+;; (include "schedule.egg")

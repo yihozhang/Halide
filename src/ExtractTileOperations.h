@@ -7,13 +7,192 @@
  */
 
 #include "Expr.h"
+#include "IRMutator.h"
+#include "IRVisitor.h"
 
 namespace Halide {
 namespace Internal {
 
+namespace EqSatExtensions {
+
+enum class Location {
+    Mem,
+    AMX,
+    WMMA,
+
+};
+
+Location from_memory_type(MemoryType memtype);
+
+struct LocToLoc : public ExprNode<LocToLoc> {
+    Location from;
+    Location to;
+    Expr expr;
+    static Expr make(Expr expr, Type type, Location from, Location to) {
+        LocToLoc *node = new LocToLoc;
+        node->expr = expr;
+        node->type = type;
+        node->from = from;
+        node->to = to; 
+        return node;
+    }
+
+    static Expr MemToAMX(Expr expr, Type type) {
+        return make(expr, type, Location::Mem, Location::AMX);
+    }
+
+    static Expr AMXToMem(Expr expr, Type type) {
+        return make(expr, type, Location::AMX, Location::Mem);
+    }
+    // This should not matter because MemToAMX is inserted only for the EqSat phase.
+    static const IRNodeType _node_type = IRNodeType::Call;
+};
+
+// Computed is a placeholder for computed extent of ExprVars
+struct Computed : public ExprNode<Computed> {
+    static Expr make(Type type) {
+        Computed *node = new Computed;
+        node->type = Int(64);
+        return node;
+    }
+    static const IRNodeType _node_type = IRNodeType::Call;
+};
+
+struct StringVar;
+struct ExprVar;
+
+struct Var {
+    virtual ~Var() = default;
+    virtual StringVar *to_string_var() { return nullptr; }
+    virtual ExprVar *to_expr_var() { return nullptr; }
+};
+
+struct StringVar : public Var {
+    std::string name;
+    StringVar(const std::string &name)
+        : name(name) {
+    }
+    StringVar *to_string_var() override {
+        return (StringVar *) this;
+    }
+};
+
+struct ExprVar : public Var {
+    Location loc;
+    Expr expr;
+    ExprVar(Location loc, Expr expr)
+        : loc(loc), expr(std::move(expr)) {
+    }
+
+    ExprVar *to_expr_var() override {
+        return (ExprVar *) this;
+    }
+};
+
+// Generalized load where the buffer can be either a var (string)
+// or an expression.
+struct GLoad : public ExprNode<GLoad> {
+
+    std::shared_ptr<Var> name;
+
+    Expr predicate, index;
+
+    Buffer<> image;
+    Parameter param;
+    ModulusRemainder alignment;
+
+    static Expr make(Type type, std::shared_ptr<Var> name,
+                     Expr index, Buffer<> image,
+                     Parameter param,
+                     Expr predicate,
+                     ModulusRemainder alignment);
+
+    static const IRNodeType _node_type = IRNodeType::Load;
+};
+
+struct GVariable : public ExprNode<GVariable> {
+    std::shared_ptr<Var> name;
+    static Expr make(Type type, std::shared_ptr<Var> name);
+    static const IRNodeType _node_type = IRNodeType::Variable;
+};
+
+class EqSatIRVisitor : public IRVisitor {
+public:
+    using IRVisitor::visit;
+    virtual void visit(const LocToLoc *e) {
+        e->expr.accept(this);
+    }
+    virtual void visit(const GLoad *e) {
+        e->predicate.accept(this);
+        e->index.accept(this);
+    }
+    virtual void visit(const GVariable *e) {
+    }
+    virtual void visit(const Computed *e) {
+    }
+    virtual bool is_base_ir_visitor() override {
+        return false;
+    }
+};
+
+class EqSatIRMutator : public IRMutator {
+public:
+    using IRMutator::visit;
+    virtual bool is_base_ir_mutator() override {
+        return false;
+    }
+    virtual Expr visit(const LocToLoc *e) {
+        Expr value = mutate(e->expr);
+        if (value.same_as(e->expr)) {
+            return e;
+        } else {
+            return LocToLoc::make(value, e->type, e->from, e->to);
+        }
+    }
+
+    virtual std::shared_ptr<Var> visit(std::shared_ptr<Var> var) {
+        if (var->to_string_var() != nullptr) {
+            return var;
+        } else if (auto v = var->to_expr_var()) {
+            Expr expr = mutate(v->expr);
+            if (expr.same_as(v->expr)) {
+                return var;
+            } else {
+                return std::make_shared<ExprVar>(v->loc, expr);
+            }
+        }
+        internal_error << "Unknown Var type\n";
+        return {};
+    }
+
+    virtual Expr visit(const GLoad *e) {
+        Expr predicate = mutate(e->predicate);
+        Expr index = mutate(e->index);
+        return GLoad::make(e->type, visit(e->name), index, e->image, e->param, predicate, e->alignment);
+    }
+
+    virtual Expr visit(const GVariable *e) {
+        return GVariable::make(e->type, visit(e->name));
+    }
+
+    virtual Expr visit(const Computed *e) {
+        return e;
+    }
+
+};
+
+}  // namespace EqSatExtensions
+
 /** Rewrite any AMX tile operations that have been stored in the AMXTile memory
  * type as intrinsic calls, to be used in the X86 backend. */
 Stmt extract_tile_operations(const Stmt &s);
+
+Stmt eqsat_extract_tile_operations(const Stmt &s);
+
+Stmt post_process_wmma(const Stmt &s);
+
+// EqSat stuffs start here
+std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&);
 
 }  // namespace Internal
 }  // namespace Halide

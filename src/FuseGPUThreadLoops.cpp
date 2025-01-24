@@ -472,7 +472,8 @@ private:
         user_assert(op->memory_type == MemoryType::Auto ||
                     op->memory_type == MemoryType::GPUShared ||
                     op->memory_type == MemoryType::GPUTexture ||
-                    op->memory_type == MemoryType::Heap)
+                    op->memory_type == MemoryType::Heap ||
+                    op->memory_type == MemoryType::WMMAAccumulator)
             << "Allocation " << op->name << " must live in shared or heap memory, "
             << "but is scheduled to live in " << op->memory_type << " memory.\n";
 
@@ -530,6 +531,17 @@ private:
             Expr index = mutate_index(alloc, op->index);
             return Load::make(op->type, alloc->name,
                               index, op->image, op->param, predicate, op->alignment);
+        } else {
+            return IRMutator::visit(op);
+        }
+    }
+
+    Expr visit(const Variable *op) override {
+        auto it = shared.find(op->name);
+        if (op->type.is_handle() && it != shared.end()) {
+            SharedAllocation *alloc = it->second;
+            alloc->liveness.max = barrier_stage;
+            return Variable::make(op->type, alloc->name);
         } else {
             return IRMutator::visit(op);
         }
@@ -846,6 +858,33 @@ public:
             const string total_size_name = name + ".size";
             Expr total_size_var = Variable::make(Int(32), total_size_name);
 
+            // // Add the definition of the original names of clustered allocs back
+            // This does not work because the argument Reinterpret takes is just another Handle
+            //
+            // // so that handle variables are able to find them.
+            // for (int i = (int)(cluster.size()) - 1; i >= 0; i--) {
+            //     Expr group_offset = Variable::make(Int(32), name + "." + std::to_string(i) + ".offset");
+
+            //     for (const SharedAllocation &alloc : cluster[i].group) {
+            //         Expr offset = group_offset;
+            //         internal_assert(alloc.type.bytes() <= widest_type.bytes());
+            //         if (alloc.type.bytes() < widest_type.bytes()) {
+            //             offset *= (widest_type.bytes() / alloc.type.bytes());
+            //         }
+            //         offset = simplify(offset);
+
+            //         auto value = Reinterpret::make(Handle(), Reinterpret::make(UInt(64), Variable::make(Handle(), name)) + offset * widest_type.bytes());
+
+            //         string original_name;
+            //         {
+            //             size_t pos = alloc.name.find_last_of('.');
+            //             internal_assert(pos != std::string::npos && alloc.name.substr(pos + 1).find_first_not_of("0123456789") == std::string::npos);
+            //             original_name = alloc.name.substr(0, pos);
+            //         }
+            //         s = LetStmt::make(original_name, value, s);
+            //     }
+            // }
+
             // Make the allocation
             if (memory_type == MemoryType::Heap) {
                 global_allocations.push_back(GlobalAllocation{name, total_size, alloc_type});
@@ -874,6 +913,18 @@ public:
                     // Rewrite all loads and stores to point to the allocation
                     // cluster they belong to with the appropriate offset into it.
                     class RewriteGroupAccess : public IRMutator {
+
+                        // a mapping from intrinsics to the positions of their handle and offset arguments.
+                        // currently only has wmma-intrinsics related to load/store
+                        //
+                        // assumes pointer arthimetic for the offset
+                        map<string, pair<int, int>> intrinsics_with_handle_args = {
+                            {"wmma.load.a.sync.aligned.row.m16n16k16.f16", {0, 1}},
+                            {"wmma.load.b.sync.aligned.row.m16n16k16.f16", {0, 1}},
+                            {"wmma.load.c.sync.aligned.row.m16n16k16.f32", {0, 1}},
+                            {"wmma.store.d.sync.aligned.row.m16n16k16.f32", {0, 2}},
+                        };
+
                         using IRMutator::visit;
                         Expr visit(const Load *op) override {
                             if (op->name == alloc_name) {
@@ -892,6 +943,23 @@ public:
                             } else {
                                 return IRMutator::visit(op);
                             }
+                        }
+
+                        Expr visit(const Call *op) override {
+                            auto it = intrinsics_with_handle_args.find(op->name);
+                            if (it != intrinsics_with_handle_args.end()) {
+                                int handle_pos = it->second.first;
+                                int offset_pos = it->second.second;
+                                const Variable *var = op->args[handle_pos].as<Variable>();
+                                internal_assert(var);
+                                if (var->name == alloc_name) {
+                                    vector<Expr> new_args(op->args);
+                                    new_args[handle_pos] = Variable::make(Handle(), cluster_name);
+                                    new_args[offset_pos] = new_args[offset_pos] + offset;
+                                    return Call::make(op->type, op->name, new_args, op->call_type);
+                                }
+                            }
+                            return IRMutator::visit(op);
                         }
                         const string &alloc_name;
                         const string &cluster_name;

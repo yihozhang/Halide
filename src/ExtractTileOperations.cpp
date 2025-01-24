@@ -1,9 +1,23 @@
 #include "ExtractTileOperations.h"
 
+#include "CanonicalizeGPUVars.h"
+#include "EqSatIRParser.h"
+#include "EqSatIRPrinter.h"
 #include "IRMatch.h"
 #include "IRMutator.h"
 #include "IROperator.h"
 #include "Util.h"
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <memory>
+#include <regex>
+#include <sstream>
+#include <string>
+#include <sys/fcntl.h>
+#include <unistd.h>
+#include <unordered_set>
+#include <utility>
 
 /** \file Support extraction of AMX instructions. */
 
@@ -32,12 +46,10 @@
 
 namespace Halide {
 namespace Internal {
-
 using std::string;
 using std::vector;
 
 namespace {
-
 template<int Dim>
 struct Tile {
     bool result;
@@ -81,35 +93,7 @@ const auto wild_i32x = Variable::make(Int(32, 0), "*");
 
 Tile<1> get_1d_tile_index(const Expr &e) {
     if (const auto *r1 = e.as<Ramp>()) {
-
-        const auto stride_var = Variable::make(Int(32), "stride");
-        const auto v1 = Variable::make(Int(32), "v1");
-        const auto v2 = Variable::make(Int(32), "v2");
-        const auto v3 = Variable::make(Int(32), "v3");
-
-        Expr patterns[] = {
-            ((v1 * stride_var) + v2) * v3,
-            v3 * ((v1 * stride_var) + v2),
-            (v2 + (v1 * stride_var)) * v3,
-            v3 * (v2 + (v1 * stride_var)),
-        };
-
-        std::map<std::string, Expr> matches;
-        for (const auto &pattern : patterns) {
-            if (expr_match(pattern, r1->base, matches)) {
-                auto stride = std::move(matches["stride"]);
-                // stride must be a constant in order to not be confused with v1
-                if (stride.as<IntImm>()) {
-                    return {true, r1->base, {std::move(stride)}, {r1->lanes}};
-                }
-
-                // if stride wasn't a constant then v1 could possibly be the stride if constant
-                auto v1_expr = std::move(matches["v1"]);
-                if (v1_expr.as<IntImm>()) {
-                    return {true, r1->base, {std::move(v1_expr)}, {r1->lanes}};
-                }
-            }
-        }
+        return {true, r1->base, {r1->stride}, {r1->lanes}};
     }
 
     return {};
@@ -218,7 +202,7 @@ Tile<3> get_3d_tile_index(const Expr &e) {
  * The pattern which is getting matched looks roughly like
  * `broadcast(ramp(0, 1, r), x*y) / broadcast(4, x*y*r) + optional(broadcast(base, x*y*r)) * broadcast(8, x*y*r) +
  *  broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r) +
- *  broadcast(ramp(broadcast(_, r), broadcast(4, r), x) , y)`
+ *  broadcast(ramp(broadcast(_, r), broadcast(4, r), y) , x)`
  */
 Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     const auto *sub = e.as<Sub>();
@@ -239,38 +223,38 @@ Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     // The right hand side of the add expression is used for retrieving the dimensions of the matrix.
     // obtain the x, y, r dimensions
     // this expr looks like below, the shape of `add_lhs->a` can be seen further down below
-    // broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r) + broadcast(ramp(broadcast(base, r), broadcast(4, r), x) , y)
+    // broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r) + broadcast(ramp(broadcast(base, r), broadcast(4, r), y) , x)
     const Add *dim_expr = add_lhs->b.as<Add>();
 
     if (!dim_expr) {
         return {};
     }
 
-    // broadcast(ramp(broadcast(_, r), broadcast(4, r), x), y)
+    // broadcast(ramp(broadcast(_, r), broadcast(4, r), y), x)
     const Broadcast *base_stride_bc = dim_expr->b.as<Broadcast>();
 
     if (!base_stride_bc) {
         return {};
     }
 
-    int tile_y = base_stride_bc->lanes;
+    int tile_x = base_stride_bc->lanes;
 
     // broadcast(ramp(0, 1, r), x*y) % broadcast(4, x*y*r)
-    const Mod *mod = dim_expr->a.as<Mod>();
-
-    if (!mod) {
+    std::vector<Expr> results{};
+    const Expr mod_pattern = Mod::make(wild_i32x, Broadcast::make(4 / element_width, 0));
+    if (!expr_match(mod_pattern, dim_expr->a, results)) {
         return {};
     }
 
     // broadcast(ramp(0, 1, r), x*y)
-    const Broadcast *bc_ramp = mod->a.as<Broadcast>();
+    const Broadcast *bc_ramp = results[0].as<Broadcast>();
 
     if (!bc_ramp) {
         return {};
     }
 
     int tile_xy = bc_ramp->lanes;
-    int tile_x = tile_xy / tile_y;
+    int tile_y = tile_xy / tile_x;
 
     // ramp(0, 1, r)
     const Ramp *r_ramp = bc_ramp->value.as<Ramp>();
@@ -282,21 +266,13 @@ Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     int tile_r = r_ramp->lanes;
 
     // get the base and stride
-    // ramp(broadcast(_, r), broadcast(4, r), x)
-    const Ramp *base_stride_ramp = base_stride_bc->value.as<Ramp>();
-
-    if (!base_stride_ramp) {
+    // ramp(broadcast(_, r), broadcast(4, r), y)
+    const Expr base_stride_ramp_pattern = Ramp::make(Broadcast::make(wild_i32, tile_r), Broadcast::make(4 / element_width, tile_r), tile_y);
+    if (!expr_match(base_stride_ramp_pattern, base_stride_bc->value, results)) {
         return {};
     }
 
-    // broadcast(_, r)
-    const Broadcast *base_bc = base_stride_ramp->base.as<Broadcast>();
-
-    if (!base_bc) {
-        return {};
-    }
-
-    Expr base = base_bc->value;
+    Expr base = results[0];
     Expr stride;
 
     bool found_stride = false;
@@ -308,7 +284,6 @@ Tile<3> get_3d_rhs_tile_index(const Expr &e, int element_width) {
     // this stride pattern can occur if `tile_r` is the same size as `acc`
     auto stride_pattern = Broadcast::make(Ramp::make(0, 1, tile_r), tile_x * tile_y) / Broadcast::make((4 / element_width), tile_x * tile_y * tile_r) * Broadcast::make(wild_i32, tile_x * tile_y * tile_r);
 
-    std::vector<Expr> results{};
     if (expr_match(stride_pattern, add_lhs->a, results)) {
         found_stride = true;
         stride = std::move(results[0]);
@@ -353,17 +328,39 @@ BaseStride get_rhs_tile_index(const Expr &index, int element_width, int tile_x, 
 
             return {true, rhs_tile3.base, rhs_tile3.stride[0] * element_width};
         } else {
+            // 1D: degenerate as dot product. There are two cases:
+            //   * tile_r is 4, so effectively there is only one row in the loaded tile
+            //   * rhs.stride.1 == 4 && tile_y = 1, where the loaded RHS has shape (K/4)x4
+            //     and is contiguous in the memory
             if (rhs_tile1.extent[0] != tile_y * tile_r) {
                 return {};
             }
+            if (!(rhs_tile1.stride[0].as<IntImm>() && rhs_tile1.stride[0].as<IntImm>()->value == 1)) {
+                return {};
+            }
 
-            // times 4 because of the rhs layout, each vector used by AMX is 4 bytes in size.
-            // For the 4 gets divided by the element width which means each vector has 4 elements in u8/i8 and
-            // 2 elements for bf16.
-            return {true, rhs_tile1.base, rhs_tile1.stride[0] * (4 / element_width)};
+            if (tile_r == 4 / element_width) {
+                return {true, rhs_tile1.base, 0};
+            }
+
+            if (tile_y == 1) {
+                // 4 elements in u8/i8 and 2 elements for bf16.
+                return {true, rhs_tile1.base, 4 / element_width};
+            }
+
+            return {};
         }
     } else {
+        // The only case where there is a ramp of ramp is when tile_y = 1 and so RHS has size (K/4)x4
+        // (and rhs.stride.1 != 4, for o.w. it degenerates to 1D)
         if (tile_y != rhs_tile2.extent[0] || tile_r != rhs_tile2.extent[1]) {
+            return {};
+        }
+        if (!(rhs_tile2.stride[1].as<IntImm>() && rhs_tile2.stride[1].as<IntImm>()->value == 1)) {
+            return {};
+        }
+
+        if (tile_y != 1) {
             return {};
         }
 
@@ -599,8 +596,8 @@ class ExtractTileOperations : public IRMutator {
                 body = mutate(body);
             }
 
-            auto alloc_type = amx_op_type_result_type(op_type);
-            return Allocate::make(amx_name, alloc_type, MemoryType::AMXTile, {1}, const_true(), body);
+            auto tile_type = amx_op_type_result_type(op_type);
+            return Allocate::make(amx_name, tile_type, MemoryType::AMXTile, {1}, const_true(), body);
         }
         return IRMutator::visit(op);
     }
@@ -671,8 +668,696 @@ class ExtractTileOperations : public IRMutator {
 
 }  // namespace
 
+namespace EqSatExtensions {
+
+Location from_memory_type(MemoryType memtype) {
+    if (memtype == MemoryType::AMXTile) {
+        return Location::AMX;
+    } else if (memtype == MemoryType::WMMAAccumulator) {
+        return Location::WMMA;
+    } else {
+        return Location::Mem;
+    }
+}
+
+Expr GLoad::make(Type type, std::shared_ptr<Var> name, Expr index, Buffer<> image, Parameter param, Expr predicate, ModulusRemainder alignment) {
+    internal_assert(predicate.defined()) << "Load with undefined predicate\n";
+    internal_assert(index.defined()) << "Load of undefined\n";
+    internal_assert(type.lanes() == index.type().lanes()) << "Vector lanes of Load must match vector lanes of index\n";
+    internal_assert(type.lanes() == predicate.type().lanes())
+        << "Vector lanes of Load must match vector lanes of predicate\n";
+
+    GLoad *node = new GLoad();
+    node->type = type;
+    node->name = std::move(name);
+    node->predicate = std::move(predicate);
+    node->index = std::move(index);
+    node->image = std::move(image);
+    node->param = std::move(param);
+    node->alignment = alignment;
+    return node;
+}
+
+Expr GVariable::make(Type type, std::shared_ptr<Var> name) {
+    GVariable *node = new GVariable;
+    node->type = type;
+    node->name = std::move(name);
+    return node;
+}
+
+// Inserting LocToLoc nodes to represent the data movement between different memory types
+// The only case we need to insert an AMXToMem node is when we are loading to an AMX tile
+// The only case we need to insert a MemToAMX node is when we are storing to an AMX tile
+class AnnotateDataMovement : public IRMutator {
+    using IRMutator::visit;
+
+public:
+    AnnotateDataMovement() = default;
+
+protected:
+    std::map<string, MemoryType> vars_memory_type;
+
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::AMXTile) {
+            user_assert(
+                (op->type.is_int_or_uint() && op->type.bits() == 32) ||
+                (op->type.is_float() && op->type.bits() == 32) ||
+                (op->type.is_int_or_uint() && op->type.bits() == 8) ||
+                (op->type.is_bfloat() && op->type.bits() == 16))
+                << "scheduled tile operations must yield 32-bit integers or 32-bit floats for output, 8-bit integers or 16-bit floats for input";
+            user_assert(vars_memory_type.find(op->name) == vars_memory_type.end()) << "Duplicate variable name: " << op->name;
+
+        } else if (op->memory_type == MemoryType::WMMAAccumulator) {
+            user_assert(op->type.is_float() && op->type.bits() == 32) << "currently only support float16xfloat16 to float32 for WMMA";
+
+        } else {
+            return IRMutator::visit(op);
+        }
+
+        std::map<string, MemoryType> curr_vars_memory_type(this->vars_memory_type);
+        curr_vars_memory_type[op->name] = op->memory_type;
+        ScopedValue<std::map<string, MemoryType>> old_tile_vars(vars_memory_type, std::move(curr_vars_memory_type));
+
+        Stmt body = mutate(op->body);
+
+        return Allocate::make(op->name, op->type, op->memory_type, op->extents, const_true(), body);
+    }
+
+    Expr visit(const Load *load) override {
+        auto result = vars_memory_type.find(load->name);
+        if (result != vars_memory_type.end()) {
+            internal_assert(is_const_one(load->predicate)) << "Only constant predicate is supported in accelerator tiles";
+            return LocToLoc::make(load, load->type, from_memory_type(result->second), Location::Mem);
+        } else {
+            return load;
+        }
+    }
+
+    Stmt visit(const Store *store) override {
+        auto result = vars_memory_type.find(store->name);
+        if (result != vars_memory_type.end()) {
+            // `Load` can only occur in store->value,
+            Expr value = LocToLoc::make(mutate(store->value), store->value.type(), Location::Mem, from_memory_type(result->second));
+            internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
+            return Store::make(
+                store->name,
+                value,
+                store->index,
+                store->param,
+                store->predicate,
+                store->alignment);
+        } else {
+            return IRMutator::visit(store);
+        }
+    }
+};
+
+std::string PLACEHOLDER_PREFIX = "collectstoresplaceholder";
+
+struct CollectStores : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+    std::map<std::string, Stmt> stores;
+
+    Stmt visit(const Store *op) override {
+        auto no = stores.size();
+        auto placeholder = PLACEHOLDER_PREFIX + op->name + ".eqsat." + std::to_string(no);
+        placeholder = replace_all(placeholder, "$", "AAA");
+        placeholder = replace_all(placeholder, ".", "BBB");
+        stores[placeholder] = op;
+        return Store::make(placeholder, op->value, op->index, op->param, op->predicate, op->alignment);
+    }
+};
+
+class RemoveGLoadsAndGVars : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+
+public:
+    struct PrologueStmt {
+        std::string name;
+        Expr expr;
+    };
+    RemoveGLoadsAndGVars(const std::string &prefix)
+        : prefix(prefix) {
+    }
+
+    const std::vector<PrologueStmt> &get_prologues() {
+        return this->prologues;
+    }
+
+protected:
+    std::string prefix;
+    int store_no = 0;
+    std::vector<PrologueStmt> prologues;
+    Expr visit(const GLoad *load) override {
+        if (const StringVar *v = load->name.get()->to_string_var()) {
+            return Load::make(load->type, v->name, EqSatIRMutator::mutate(load->index), load->image, load->param, EqSatIRMutator::mutate(load->predicate), load->alignment);
+        } else if (const ExprVar *v = load->name.get()->to_expr_var()) {
+            // We traverse children first to ensure that the prologues are in the correct order
+            Expr predicate = EqSatIRMutator::mutate(load->predicate);
+            Expr index = EqSatIRMutator::mutate(load->index);
+
+            std::string name = prefix + ".temporary." + std::to_string(store_no++);
+            prologues.push_back({name, mutate(v->expr)});
+            return Load::make(load->type, name, index, load->image, load->param, predicate, load->alignment);
+        } else {
+            internal_error << "GLoad name must be a StringVar or ExprVar\n";
+            return {};
+        }
+    }
+
+    Expr visit(const GVariable *var) override {
+        if (const StringVar *v = var->name.get()->to_string_var()) {
+            return Variable::make(var->type, v->name);
+        } else if (const ExprVar *v = var->name.get()->to_expr_var()) {
+            auto name = prefix + ".temporary." + std::to_string(store_no++);
+            prologues.push_back({name, mutate(v->expr)});
+            return Variable::make(var->type, name);
+        } else {
+            internal_error << "GVariable name must be a StringVar\n";
+            return {};
+        }
+    }
+};
+
+struct SubstStores : public EqSatIRMutator {
+    using EqSatIRMutator::visit;
+    const std::map<std::string, Stmt> &stores;
+
+    SubstStores(std::map<std::string, Stmt> &&stores)
+        : stores(stores) {
+    }
+
+    Stmt visit(const Store *op) override {
+        internal_assert(op->name.find(PLACEHOLDER_PREFIX) == 0)
+            << "All stores should have been replaced with a place holder";
+        auto it = stores.find(op->name);
+        internal_assert(it != stores.end()) << "Store not found";
+
+        Stmt s = it->second;
+        auto prefix = replace_all(op->name.substr(PLACEHOLDER_PREFIX.length()), "AAA", "$");
+        prefix = replace_all(prefix, "BBB", ".");
+        RemoveGLoadsAndGVars remover(prefix);
+        s = remover.mutate(s);
+
+        vector<Stmt> stores;
+        for (const auto &prologue : remover.get_prologues()) {
+            int lanes = prologue.expr.type().lanes();
+            stores.push_back(Store::make(prologue.name, prologue.expr, Ramp::make(0, 1, lanes), Parameter(), const_true(lanes), ModulusRemainder()));
+        }
+        stores.push_back(s);
+        s = Block::make(stores);
+        for (auto i = remover.get_prologues().rbegin(); i != remover.get_prologues().rend(); i++) {
+            s = Allocate::make(i->name, i->expr.type(), MemoryType::Auto, {1}, const_true(i->expr.type().lanes()), s);
+        }
+
+        return s;
+    }
+};
+
+Type convert_to_tile_type(Type type) {
+    Type tile_type;
+    if (type.is_bfloat() && type.bits() == 16) {
+        tile_type = BFloat(16, 512);
+    } else if (type.is_int() || type.is_uint() || type.is_float()) {  // is_float() returns true for bfloat
+        tile_type = type.with_lanes(1024 / type.bytes());
+    } else {
+        internal_error << "Unsupported type for AMX tile";
+    }
+    return tile_type;
+}
+
+// The expression returned by EqSat, is not necessarily compatiable with the
+// runtime, since the runtime always views an AMX Tile as a 256-lane vector.
+class EnforceAMXShape : public IRMutator {
+    using IRMutator::visit;
+
+protected:
+    std::vector<string> tile_vars;
+    std::unordered_map<string, int> amx_tile_size;
+
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::AMXTile) {
+            std::vector<string> curr_tile_vars(this->tile_vars);
+            curr_tile_vars.push_back(op->name);
+            ScopedValue<vector<string>> old_tile_vars(tile_vars, std::move(curr_tile_vars));
+            auto body = mutate(op->body);
+            internal_assert(amx_tile_size.count(op->name)) << "AMX tile size not found";
+
+            auto tile_type = convert_to_tile_type(op->type);
+            return Allocate::make(op->name, tile_type, MemoryType::AMXTile, {amx_tile_size[op->name]}, const_true(), body);
+        } else {
+            return IRMutator::visit(op);
+        }
+    }
+
+    int get_nth_tile_from_tile_index(const Expr &e) {
+        const Ramp *ramp = e.as<Ramp>();
+        if (!ramp) {
+            internal_error << "AMX tile can only be indexed with ramp";
+            return -1;
+        }
+        int vec_length = ramp->lanes;
+        const int64_t *basep = as_const_int(ramp->base);
+        if (!basep) {
+            internal_error << "Only constant base is supported in AMX";
+            return -1;
+        }
+        int base = (int)*basep;
+        internal_assert(base % vec_length == 0) << "Cannot determine which AMX tile to load from";
+        return base / vec_length;
+    }
+
+    Expr visit(const Load *load) override {
+        if (std::find(tile_vars.begin(), tile_vars.end(), load->name) != tile_vars.end()) {
+            int tile = get_nth_tile_from_tile_index(load->index);
+            amx_tile_size[load->name] = std::max(amx_tile_size[load->name], tile + 1);
+            Type tile_type = convert_to_tile_type(load->type);
+            int tile_lanes = tile_type.lanes();
+            return Load::make(tile_type,
+                              load->name,
+                              Ramp::make(tile_lanes * tile, 1, tile_lanes),
+                              load->image,
+                              load->param,
+                              const_true(tile_lanes),
+                              load->alignment);
+        } else {
+            return load;
+        }
+    }
+
+    Stmt visit(const Store *store) override {
+        if (std::find(tile_vars.begin(), tile_vars.end(), store->name) != tile_vars.end()) {
+            internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
+            int tile = get_nth_tile_from_tile_index(store->index);
+            amx_tile_size[store->name] = std::max(amx_tile_size[store->name], tile + 1);
+            int tile_lanes = convert_to_tile_type(store->value.type()).lanes();
+
+            // There should not be a Load in places other than value,
+            // so we don't need to mutate them.
+            Expr value = mutate(store->value);
+            return Store::make(
+                store->name,
+                value,
+                Ramp::make(tile * tile_lanes, 1, tile_lanes),
+                store->param,
+                const_true(tile_lanes),
+                store->alignment);
+        } else {
+            return IRMutator::visit(store);
+        }
+    }
+
+    Expr visit(const Call *call) override {
+        // Not included:
+        // - tile_store since it returns a single value
+        vector<string> intrinsic_names = {"tile_load", "tile_matmul", "tile_zero"};
+
+        if (std::find(intrinsic_names.begin(), intrinsic_names.end(), call->name) != intrinsic_names.end()) {
+            return Call::make(
+                convert_to_tile_type(call->type),
+                call->name,
+                mutate(call->args),
+                call->call_type,
+                call->func,
+                call->value_index,
+                call->image,
+                call->param);
+        } else {
+            return IRMutator::visit(call);
+        }
+    }
+};
+
+// The intrinsics for WMMA operations are internally represented as a single-thread operation.
+// However, it should be a warp-level instruction. This pass wraps the WMMA operation with GPU_lanes
+// and updates the types.
+// More concretely, this pass
+// (1) removes the gpu_thread(idx, 0, 1) loop and replaces it with a gpu_lane(idx, 0, 32) loop
+// (2) shrinks the type of the WMMA intrinsics to be per lane
+// This pass shares many code with EnforceAMXShape, but for now we keep them separate.
+class EnforceWMMALanes : public IRMutator {
+    using IRMutator::visit;
+
+    std::vector<string> tile_vars;
+    std::map<string, Type> intrinsic_types = {
+        {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Int(32, 8)},
+        {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Int(32, 8)},
+        {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 8)},
+        {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 8)},
+    };
+
+protected:
+    bool wmma_used = false;
+
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::WMMAAccumulator) {
+            internal_assert(op->constant_allocation_size() % 32 == 0);
+            internal_assert(op->type.lanes() == 1);
+
+            std::vector<string> curr_tile_vars(this->tile_vars);
+            curr_tile_vars.push_back(op->name);
+            ScopedValue<vector<string>> old_tile_vars(tile_vars, std::move(curr_tile_vars));
+
+            auto body = mutate(op->body);
+            auto lanes = op->constant_allocation_size() / 32;
+            return Allocate::make(op->name,
+                                  op->type.with_lanes(lanes),
+                                  MemoryType::WMMAAccumulator, {1}, const_true(),
+                                  body);
+        } else {
+            return IRMutator::visit(op);
+        }
+    }
+
+    Expr visit(const Call *op) override {
+        // HACK: this makes sense only for all zero initialization
+        // if (op->name == "wmma.load.c.sync.aligned.row.m16n16k16.f32") {
+        //     wmma_used = true;
+        //     return make_zero(intrinsic_types[op->name]);
+        // } else 
+        if (intrinsic_types.count(op->name)) {
+            wmma_used = true;
+            internal_assert(op->type.lanes() % 32 == 0);
+            return Call::make(
+                intrinsic_types[op->name],
+                op->name,
+                mutate(op->args),
+                op->call_type,
+                op->func,
+                op->value_index,
+                op->image,
+                op->param);
+        } else {
+            if (op->name == "wmma.store.d.sync.aligned.row.m16n16k16.f32") {
+                wmma_used = true;
+            }
+            return IRMutator::visit(op);
+        }
+    }
+
+    Expr visit(const Load *load) override {
+        if (std::find(tile_vars.begin(), tile_vars.end(), load->name) != tile_vars.end()) {
+            internal_assert(load->type.lanes() % 32 == 0);
+            int tile_lanes = load->type.lanes() / 32;
+            Type tile_type = load->type.with_lanes(tile_lanes);
+            return Load::make(tile_type,
+                              load->name,
+                              Ramp::make(0, 1, tile_lanes),
+                              load->image,
+                              load->param,
+                              const_true(tile_lanes),
+                              load->alignment);
+        } else {
+            return load;
+        }
+    }
+
+    Stmt visit(const Evaluate *op) override {
+        internal_assert(!wmma_used);
+        auto new_op = IRMutator::visit(op);
+        if (wmma_used) {
+            wmma_used = false;
+            return For::make("wmma_gpu_lane.thread_id_x", 0, 32, ForType::GPULane, Partition::Auto, DeviceAPI::CUDA, new_op);
+        } else {
+            return new_op;
+        }
+    }
+
+    Stmt visit(const Store *store) override {
+        if (std::find(tile_vars.begin(), tile_vars.end(), store->name) != tile_vars.end()) {
+            internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
+            internal_assert(store->value.type().lanes() % 32 == 0);
+            int tile_lanes = store->value.type().lanes() / 32;
+
+            // There should not be a Load in places other than value,
+            // so we don't need to mutate them.
+            internal_assert(!wmma_used);
+            Expr value = mutate(store->value);
+            internal_assert(wmma_used);
+            wmma_used = false;
+            auto op = Store::make(
+                store->name,
+                value,
+                Ramp::make(0, 1, tile_lanes),
+                store->param,
+                const_true(tile_lanes),
+                store->alignment);
+            op = For::make("wmma_gpu_lane.thread_id_x", 0, 32, ForType::GPULane, Partition::Auto, DeviceAPI::CUDA, op);
+            return op;
+        } else {
+            return IRMutator::visit(store);
+        }
+    }
+};
+
+class DesugarIntrinsics : public IRMutator {
+    using IRMutator::visit;
+
+protected:
+    Expr visit(const Call *call) override {
+        if (call->name == "KWayInterleave") {
+            std::vector<Expr> args = call->args;
+            internal_assert(args.size() == 3);
+            const int64_t *pk = as_const_int(args[0]);
+            Expr vec = mutate(args[1]);
+            const int64_t *planes = as_const_int(args[2]);
+            if (!pk || !planes) {
+                internal_error << "KWayInterleave requires constant k and lanes\n";
+                return {};
+            }
+            int K = *pk;
+            int lanes = *planes;
+            internal_assert(vec.type().lanes() % lanes == 0) << "Vector size must be a multiple of #lanes\n";
+            internal_assert(lanes % K == 0) << "Number of lanes must be a multiple of k\n";
+            int length = vec.type().lanes() / lanes;
+
+            std::vector<int> indices;
+            for (int i = 0; i < lanes; i += K) {
+                for (int j = 0; j < length; j++) {
+                    for (int k = 0; k < K; k++) {
+                        indices.push_back((i + k) * length + j);
+                    }
+                }
+            }
+            return Shuffle::make({vec}, indices);
+
+        } else {
+            return IRMutator::visit(call);
+        }
+    }
+};
+
+// This class expects the following forms
+//  Allocate b[...] from WMMAAccumulator
+//    ...
+//    gpu_lanes / gpu_threads
+// and translates it to
+//  ...
+//  gpu_lanes / gpu_threads
+//   Allocate b[...] from WMMAAccumulator
+class PushWMMAAllocation : public IRMutator {
+    using IRMutator::visit;
+
+    vector<const Allocate *> alloc_ops;
+protected:
+    Stmt visit(const Allocate *op) override {
+        if (op->memory_type == MemoryType::WMMAAccumulator) {
+            ScopedValue<vector<const Allocate *>> old_alloc_ops(alloc_ops);
+            alloc_ops.push_back(op);
+            return mutate(op->body);
+        }
+        return IRMutator::visit(op);
+    }
+
+    Stmt visit(const For* op) override {
+        if (op->for_type == ForType::GPULane && alloc_ops.size() > 0) {
+            auto body = op->body;
+            for (auto iter = alloc_ops.rbegin(); iter != alloc_ops.rend(); iter++) {
+                auto alloc_op = *iter;
+                body = Allocate::make(alloc_op->name, alloc_op->type, alloc_op->memory_type, alloc_op->extents, alloc_op->condition, body);
+            }
+            return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, body);
+        } else {
+            return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, mutate(op->body));;
+        }
+    }
+};
+
+}  // namespace EqSatExtensions
+
 Stmt extract_tile_operations(const Stmt &s) {
     return ExtractTileOperations().mutate(s);
 }
+
+Stmt eqsat_extract_tile_operations(const Stmt &s) {
+    auto annotated_s = EqSatExtensions::AnnotateDataMovement().mutate(s);
+    EqSatExtensions::CollectStores collect_stores;
+    auto result = collect_stores.mutate(annotated_s);
+    auto &stores = collect_stores.stores;
+
+    std::vector<std::pair<std::string, std::string>> bindings;
+
+    for (const auto &[name, op] : stores) {
+        std::ostringstream oss;
+        EqSatIRPrinter sprinter(oss);
+        sprinter.print(op);
+        bindings.emplace_back(name, oss.str());
+    }
+
+    auto output = run_egglog(std::move(bindings));
+    auto optimized_programs = split_string(output, "\n");
+    bool amx_synthesized = false;
+    std::map<std::string, Stmt> new_stores;
+    for (size_t i = 0; i < optimized_programs.size(); ++i) {
+        if (optimized_programs[i].empty()) {
+            continue;
+        }
+        auto &optimized = optimized_programs[i];
+        auto &name = bindings[i].first;
+        amx_synthesized = amx_synthesized || optimized.find("tile_matmul") != string::npos;
+
+        EqSatExtensions::EqSatIRParser parser(optimized);
+
+        new_stores[name] = parser.parse_stmt();
+    }
+    if (!amx_synthesized) {
+        std::cerr << "amx NOT synthesized\n";
+    } else {
+        std::cerr << "amx synthesized\n";
+    }
+    result = EqSatExtensions::SubstStores(std::move(new_stores)).mutate(result);
+    result = EqSatExtensions::EnforceAMXShape().mutate(result);
+    result = EqSatExtensions::EnforceWMMALanes().mutate(result);
+    result = EqSatExtensions::DesugarIntrinsics().mutate(result);
+    return result;
+}
+
+Stmt post_process_wmma(const Stmt &s) {
+    return EqSatExtensions::PushWMMAAllocation().mutate(s);
+}
+
+std::string run_egglog(std::vector<std::pair<std::string, std::string>> &&binding) {
+#include "egglog/main.tmpl.h"
+
+    std::string egglog_prog = EGGLOG_PROG(std::move(binding));
+
+    std::string filename = "/tmp/egglog_prog_" + std::to_string(getpid()) + ".egg";
+    // Write the program to a file
+    std::cout << "Writing egglog program to " << filename << std::endl;
+    std::ofstream file(filename);
+    file << egglog_prog << std::flush;
+
+    int pipe_stdin[2];
+    int pipe_stdout[2];
+
+    if (pipe(pipe_stdin) < 0 || pipe(pipe_stdout) < 0) {
+        internal_error << "Failed to create pipe for egglog";
+        return "";
+    }
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        internal_error << "Failed to exec egglog";
+    }
+
+    if (pid == 0) {
+        const char *argv[] = {"egglog-halide-sidecar", nullptr};
+        close(pipe_stdin[1]);
+        close(pipe_stdout[0]);
+
+        // Redirect stdin and stdout
+        dup2(pipe_stdin[0], STDIN_FILENO);
+        dup2(pipe_stdout[1], STDOUT_FILENO);
+        int devnull = open("/dev/null", O_WRONLY | O_CREAT, 0666);
+        dup2(devnull, STDERR_FILENO);
+        close(pipe_stdin[0]);
+        close(pipe_stdout[1]);
+        execvp(argv[0], const_cast<char **>(argv));
+        internal_error << "egglog failed to exec";
+        return "";
+    }
+
+    close(pipe_stdout[1]);
+
+    // Write to the subprocess's stdin
+    write(pipe_stdin[1], egglog_prog.c_str(), egglog_prog.size());
+    close(pipe_stdin[1]);
+
+    // Read from the subprocess's stdout
+    std::ostringstream oss;
+    char buffer[128];
+    ssize_t count;
+    while ((count = read(pipe_stdout[0], buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[count] = '\0';  // Null-terminate the string
+        oss << buffer;
+    }
+
+    close(pipe_stdout[0]);
+    return oss.str();
+}
+
+template<>
+void ExprNode<EqSatExtensions::LocToLoc>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRVisitor *ev = (EqSatIRVisitor *)v;
+    internal_assert(!v->is_base_ir_visitor()) << "LocToLoc can only be visited by EqSatIRVisitor\n";
+    ev->visit((const LocToLoc *)this);
+}
+template<>
+void ExprNode<EqSatExtensions::GLoad>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRVisitor *ev = (EqSatIRVisitor *)v;
+    internal_assert(!v->is_base_ir_visitor()) << "GLoad can only be mutated by EqSatIRVisitor\n";
+    ev->visit((const GLoad *)this);
+}
+template<>
+void ExprNode<EqSatExtensions::Computed>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRVisitor *ev = (EqSatIRVisitor *)v;
+    internal_assert(!v->is_base_ir_visitor()) << "Computed can only be mutated by EqSatIRVisitor\n";
+    ev->visit((const Computed *)this);
+}
+
+template<>
+void ExprNode<EqSatExtensions::GVariable>::accept(IRVisitor *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRVisitor *ev = (EqSatIRVisitor *)v;
+    internal_assert(!v->is_base_ir_visitor()) << "GVariable can only be mutated by EqSatIRVisitor\n";
+    ev->visit((const GVariable *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::LocToLoc>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = (EqSatIRMutator *)v;
+    internal_assert(!v->is_base_ir_mutator()) << "LocToLoc can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const LocToLoc *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::GLoad>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = (EqSatIRMutator *)v;
+    internal_assert(!v->is_base_ir_mutator()) << "GLoad can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const GLoad *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::GVariable>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = (EqSatIRMutator *)v;
+    internal_assert(!v->is_base_ir_mutator()) << "GVariable can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const GVariable *)this);
+}
+
+template<>
+Expr ExprNode<EqSatExtensions::Computed>::mutate_expr(IRMutator *v) const {
+    using namespace EqSatExtensions;
+    EqSatIRMutator *ev = (EqSatIRMutator *)v;
+    internal_assert(!v->is_base_ir_mutator()) << "Computed can only be mutated by EqSatIRMutator\n";
+    return ev->visit((const Computed *)this);
+}
+
 }  // namespace Internal
 }  // namespace Halide
