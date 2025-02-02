@@ -58,6 +58,8 @@ public:
         return "cuda";
     }
 
+    std::map<std::string, MemoryType> memory_type_of;
+
 protected:
     using CodeGen_LLVM::visit;
 
@@ -245,8 +247,12 @@ void CodeGen_PTX_Dev::init_module() {
         {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Int(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.a.row.stride.f16", {Handle(), Int(32), Int(32)}, true},
         {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Int(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16", {Handle(), Int(32), Int(32)}, true},
         {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32", {Handle(), Int(32), Int(32)}, true},
-        {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32", {Int(32, 8), Int(32, 8), Float(32, 8)}, true},
         {"wmma.store.d.sync.aligned.row.m16n16k16.f32", Int(32), "adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32", {Handle(), Float(32, 8), Int(32), Int(32)}, true},
+        {"wmma.load.a.sync.aligned.row.m16n16k16.f16.p3i32", Int(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.a.row.stride.f16.p3i32", {Handle(), Int(32), Int(32)}, true},
+        {"wmma.load.b.sync.aligned.row.m16n16k16.f16.p3i32", Int(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.b.row.stride.f16.p3i32", {Handle(), Int(32), Int(32)}, true},
+        {"wmma.load.c.sync.aligned.row.m16n16k16.f32.p3i32", Float(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.load.c.row.stride.f32.p3i32", {Handle(), Int(32), Int(32)}, true},
+        {"wmma.store.d.sync.aligned.row.m16n16k16.f32.p3i32", Int(32), "adapted.llvm.nvvm.wmma.m16n16k16.store.d.row.stride.f32", {Handle(), Float(32, 8), Int(32), Int(32)}, true},
+        {"wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32", Float(32, 8), "adapted.llvm.nvvm.wmma.m16n16k16.mma.row.row.f32.f32", {Int(32, 8), Int(32, 8), Float(32, 8)}, true},
 
     };
 
@@ -277,8 +283,22 @@ void CodeGen_PTX_Dev::visit(const Call *op) {
         return;
     }
 
-    // TODO: It would be better if CodeGen_LLVM could handle overloaded intrin calls by default.
-    value = call_overloaded_intrin(op->type, op->name, op->args);
+    if (op->name.find(".load.") != string::npos || op->name.find(".store.") != string::npos) {
+        string suffix;
+        auto it = memory_type_of.find(op->args[0].as<Variable>()->name);
+        if (it == memory_type_of.end()) {
+            suffix = "";
+        } else if (it->second == MemoryType::GPUShared) {
+            suffix = ".p3i32";
+        } else {
+            internal_error << "cannot load from local memory\n";
+        }
+        value = call_overloaded_intrin(op->type, op->name + suffix, op->args);
+    } else {
+        // TODO: It would be better if CodeGen_LLVM could handle overloaded intrin calls by default.
+        value = call_overloaded_intrin(op->type, op->name, op->args);
+    }
+
     if (!value) {
         CodeGen_LLVM::visit(op);
     }
@@ -317,6 +337,7 @@ void CodeGen_PTX_Dev::visit(const For *loop) {
 void CodeGen_PTX_Dev::visit(const Allocate *alloc) {
     user_assert(!alloc->new_expr.defined()) << "Allocate node inside PTX kernel has custom new expression.\n"
                                             << "(Memoization is not supported inside GPU kernels at present.)\n";
+    memory_type_of[alloc->name] = alloc->memory_type;
     if (alloc->memory_type == MemoryType::GPUShared) {
         // PTX uses zero in address space 3 as the base address for shared memory
         Value *shared_base = Constant::getNullValue(PointerType::get(i8_t, 3));

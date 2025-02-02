@@ -867,7 +867,7 @@ struct SubstStores : public EqSatIRMutator {
         stores.push_back(s);
         s = Block::make(stores);
         for (auto i = remover.get_prologues().rbegin(); i != remover.get_prologues().rend(); i++) {
-            s = Allocate::make(i->name, i->expr.type(), MemoryType::Auto, {1}, const_true(i->expr.type().lanes()), s);
+            s = Allocate::make(i->name, i->expr.type().with_lanes(1), MemoryType::Auto, {i->expr.type().lanes()}, const_true(i->expr.type().lanes()), s);
         }
 
         return s;
@@ -1021,8 +1021,8 @@ protected:
             auto body = mutate(op->body);
             auto lanes = op->constant_allocation_size() / 32;
             return Allocate::make(op->name,
-                                  op->type.with_lanes(lanes),
-                                  MemoryType::WMMAAccumulator, {1}, const_true(),
+                                  op->type.with_lanes(1),
+                                  MemoryType::WMMAAccumulator, {lanes}, const_true(),
                                   body);
         } else {
             return IRMutator::visit(op);
@@ -1030,11 +1030,6 @@ protected:
     }
 
     Expr visit(const Call *op) override {
-        // HACK: this makes sense only for all zero initialization
-        // if (op->name == "wmma.load.c.sync.aligned.row.m16n16k16.f32") {
-        //     wmma_used = true;
-        //     return make_zero(intrinsic_types[op->name]);
-        // } else 
         if (intrinsic_types.count(op->name)) {
             wmma_used = true;
             internal_assert(op->type.lanes() % 32 == 0);
@@ -1159,6 +1154,7 @@ class PushWMMAAllocation : public IRMutator {
     using IRMutator::visit;
 
     vector<const Allocate *> alloc_ops;
+
 protected:
     Stmt visit(const Allocate *op) override {
         if (op->memory_type == MemoryType::WMMAAccumulator) {
@@ -1169,16 +1165,20 @@ protected:
         return IRMutator::visit(op);
     }
 
-    Stmt visit(const For* op) override {
+    Stmt visit(const For *op) override {
         if (op->for_type == ForType::GPULane && alloc_ops.size() > 0) {
             auto body = op->body;
             for (auto iter = alloc_ops.rbegin(); iter != alloc_ops.rend(); iter++) {
                 auto alloc_op = *iter;
-                body = Allocate::make(alloc_op->name, alloc_op->type, alloc_op->memory_type, alloc_op->extents, alloc_op->condition, body);
+                auto type = alloc_op->type.with_lanes(1);
+                auto extents = alloc_op->extents;
+                extents.insert(extents.begin(), alloc_op->type.lanes());
+                body = Allocate::make(alloc_op->name, type, alloc_op->memory_type, extents, alloc_op->condition, body);
             }
             return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, body);
         } else {
-            return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, mutate(op->body));;
+            return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, mutate(op->body));
+            ;
         }
     }
 };
