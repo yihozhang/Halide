@@ -393,6 +393,8 @@ enum class MemoryType {
 
     /** Registers for TensorCore's Warp-level Matrix Multiplication. */
     WMMAAccumulator,
+    WMMAA,
+    WMMAB,
 };
 
 namespace Internal {

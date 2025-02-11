@@ -1,6 +1,6 @@
 ; prog +=  R"***(
 
-;; different from AMX, the last column denotes number of elements rather than colbytes
+;; different from WMMA, the last column denotes number of elements rather than colbytes
 (relation WMMAAllocation (String i64 i64))
 (relation WMMAShape (Expr i64 i64))
 
@@ -24,6 +24,69 @@
         (WMMAShape e rows cols)
     ))
 
+;; Axiomatic rules about WMMA2Mem and Mem2WMMA
+
+(birewrite (Cast ty (WMMA2Mem e)) (WMMA2Mem (Cast ty e)))
+(birewrite (Cast ty (Mem2WMMA e)) (Mem2WMMA (Cast ty e)))
+(birewrite (BroadcastPer p (Mem2WMMA e) l) (Mem2WMMA (BroadcastPer p e l)))
+(birewrite (WMMA2Mem (BroadcastPer p e l)) (BroadcastPer p (WMMA2Mem e) l))
+
+
+(relation wmma-f16-rhs (
+    Expr ;; orig-expr
+    i64 ;; x-lanes
+    i64 ;; y-lanes
+    i64 ;; r-lanes
+    Expr ;; rhs-expr
+))
+
+(rule (
+    (= rhs (Load (Float 16 tot-lanes) rhs-name rhs-index))
+
+    (= rhs-index
+        (Broadcast
+            (Ramp (Ramp rhs-base
+                    rhs-r-stride
+                    r-lanes
+                )
+                (Broadcast (IntImm32 1) r-lanes)
+                y-lanes
+            )
+            x-lanes
+        )
+    )
+
+    (= x-lanes 16)
+    (= y-lanes 16)
+    (= r-lanes 16)
+) (
+    (let new-rhs (Call "wmma.load.b.sync.aligned.row.m16n16k16.f16" (Float 16 256) (vec-of (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
+    (wmma-f16-rhs rhs x-lanes y-lanes r-lanes new-rhs)
+))
+
+
+
+    ; (wmma-f16-rhs 
+    ;     (WMMA2Mem (Load ty name (Ramp (Ramp (IntImm32 0) (IntImm32 16) 16) (Broadcast (IntImm32 ) 16) 16))) 
+    ;     16 16 16
+    ;     (Load ty name (Ramp (Ramp (IntImm32 0) (IntImm32 16) 16) (Broadcast (IntImm32 1) 16) 16)))
+(rule (
+    (= orig-rhs-mem (WMMA2Mem orig-rhs))
+    (= orig-rhs (Load (Float 16 tot-lanes) rhs-name rhs-index))
+    (= rhs-index
+        (Broadcast
+            (Ramp (Ramp rhs-base rhs-r-stride r-lanes)
+                  (Broadcast (IntImm32 1) r-lanes)
+                   y-lanes)
+            x-lanes))
+
+    (= x-lanes 16)
+    (= y-lanes 16)
+    (= r-lanes 16)
+) (
+    (let new-rhs (Load (Float 16 (* r-lanes y-lanes)) rhs-name (Ramp rhs-base (IntImm32 1) (* r-lanes y-lanes))))
+    (wmma-f16-rhs orig-rhs-mem x-lanes y-lanes r-lanes new-rhs)
+))
 
 (rule (
         (= e (Bop (Add)
@@ -43,26 +106,13 @@
                 x-lanes)
         )
 
-        (= rhs (Load (Float 16 tot-lanes) rhs-name rhs-index))
-        (= rhs-index
-            (Broadcast
-                (Ramp (Ramp rhs-base
-                        rhs-r-stride
-                        r-lanes
-                    )
-                    (Broadcast (IntImm32 1) r-lanes)
-                    y-lanes
-                )
-                x-lanes
-            )
-        )
+        (wmma-f16-rhs rhs x-lanes y-lanes r-lanes new-rhs)
 
         (= x-lanes 16)
         (= y-lanes 16)
         (= r-lanes 16)
     ) (
         (let new-lhs (Call "wmma.load.a.sync.aligned.row.m16n16k16.f16" (Float 16 256) (vec-of (Var (Handle 1) lhs-name) lhs-base x-stride)))
-        (let new-rhs (Call "wmma.load.b.sync.aligned.row.m16n16k16.f16" (Float 16 256) (vec-of (Var (Handle 1) rhs-name) rhs-base rhs-r-stride)))
         (let new-mat (Mem2WMMA mat))
         (let new-e (Call "wmma.mma.sync.aligned.row.row.m16n16k16.f32.f32" (Float 32 256) (vec-of new-lhs new-rhs new-mat)))
         (WMMAShape new-e x-lanes y-lanes)
@@ -83,14 +133,14 @@
         (= rows 16)
         (= cols 16)
     ) (
-        (let new-e (Call "wmma.load.c.sync.aligned.row.m16n16k16.f32" (Float 32 lanes) (vec-of (Var (Handle 1) (ExprVar (Mem) (Broadcast (FloatImm 32 0.0) 256))) (IntImm32 0) (IntImm32 16))))
+        (let new-e (Call "wmma.load.c.sync.aligned.row.m16n16k16.f32.ZERO" (Float 32 lanes) (vec-of (IntImm32 0))))
+        ; (let new-e (Call "wmma.load.c.sync.aligned.row.m16n16k16.f32" (Float 32 lanes) (vec-of (Var (Handle 1) (ExprVar (Mem) 
         (union e new-e)
     ))
 
 (rule (
         (= s (Store store-name (WMMA2Mem tile) index))
         (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
-        (= bytes 4)
         (has-type value ty)
 
         (= m-lanes 16)
@@ -105,5 +155,21 @@
                     ))))
         (union s new-s)
     ))
+
+
+;; loading matrices A and B
+
+(rule (
+    (= e (Mem2WMMA
+        (Load ty name index)))
+    (= index (Ramp (Ramp base (IntImm32 1) m-lanes) (Broadcast n-stride m-lanes) n-lanes))
+    (= ty (Float 16 _lanes))
+
+    (= m-lanes 16)
+    (= n-lanes 16)
+) (
+    (let new-e (Call "wmma.load.b.sync.aligned.row.m16n16k16.f16" ty (vec-of (Var (Handle 1) name) base (IntImm32 0))))
+    (union e new-e)
+))
 
 ; )***"; prog += "\n";

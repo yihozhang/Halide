@@ -58,7 +58,7 @@ private:
 
     void expect(const std::string &s) {
         if (!is_head(s)) {
-            internal_error <<"Expected " << s << " at " << std::to_string(curr);
+            internal_error <<"Expected " << s << " at " << std::to_string(curr) << " but get " << prog.substr(curr);
         }
     }
 };

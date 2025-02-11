@@ -4,32 +4,32 @@
 (rule () ((keep-best __INPUTS__ "AMXShape" "AMXAllocation" "WMMAShape" "WMMAAllocation" "CommBop" "AddOrSub")) :ruleset keep-best)
 
 (run-schedule 
-    (repeat 10
+    (repeat 15
         (saturate (run typechecking))
         (run)))
 (run-schedule (saturate 
     (saturate (run typechecking))
     (run push-down-vector-reduce)))
 
-(keep-best __INPUTS__ "AMXShape" "AMXAllocation" "WMMAShape" "WMMAAllocation" "CommBop" "AddOrSub")
+; (keep-best __INPUTS__ "AMXShape" "AMXAllocation" "WMMAShape" "WMMAAllocation" "CommBop" "AddOrSub")
 
-(run-schedule (repeat 15
-    (saturate (run typechecking))
-    (repeat 1 (run))
-    ))
-(run-schedule (repeat 20
-    (saturate (run typechecking))
-    (repeat 1 (run canonicalize))
-    ))
-(run-schedule (saturate
-    (saturate (run typechecking))
-    (repeat 1 (run assemble))
-    ))
-(run-schedule (repeat 12
-    (saturate (run typechecking))
-    (repeat 1 (run))
-    ))
+; (run-schedule (repeat 15
+;     (saturate (run typechecking))
+;     (repeat 1 (run))
+;     ))
+; (run-schedule (repeat 20
+;     (saturate (run typechecking))
+;     (repeat 1 (run canonicalize))
+;     ))
+; (run-schedule (saturate
+;     (saturate (run typechecking))
+;     (repeat 1 (run assemble))
+;     ))
+; (run-schedule (repeat 12
+;     (saturate (run typechecking))
+;     (repeat 1 (run))
+;     ))
 
-(ruleset subsume-invalid-exprs)
+; (ruleset subsume-invalid-exprs)
 
 ; )***"; prog += "\n";

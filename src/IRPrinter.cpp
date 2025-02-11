@@ -156,6 +156,12 @@ std::ostream &operator<<(std::ostream &out, const MemoryType &t) {
     case MemoryType::WMMAAccumulator:
         out << "WMMAAccumulator";
         break;
+    case MemoryType::WMMAA:
+        out << "WMMAA";
+        break;
+    case MemoryType::WMMAB:
+        out << "WMMAB";
+        break;
     }
     return out;
 }

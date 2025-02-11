@@ -473,7 +473,9 @@ private:
                     op->memory_type == MemoryType::GPUShared ||
                     op->memory_type == MemoryType::GPUTexture ||
                     op->memory_type == MemoryType::Heap ||
-                    op->memory_type == MemoryType::WMMAAccumulator)
+                    op->memory_type == MemoryType::WMMAAccumulator ||
+                    op->memory_type == MemoryType::WMMAA ||
+                    op->memory_type == MemoryType::WMMAB)
             << "Allocation " << op->name << " must live in shared or heap memory, "
             << "but is scheduled to live in " << op->memory_type << " memory.\n";
 

@@ -673,7 +673,7 @@ namespace EqSatExtensions {
 Location from_memory_type(MemoryType memtype) {
     if (memtype == MemoryType::AMXTile) {
         return Location::AMX;
-    } else if (memtype == MemoryType::WMMAAccumulator) {
+    } else if (memtype == MemoryType::WMMAAccumulator || memtype == MemoryType::WMMAA || memtype == MemoryType::WMMAB) {
         return Location::WMMA;
     } else {
         return Location::Mem;
@@ -730,7 +730,7 @@ protected:
         } else if (op->memory_type == MemoryType::WMMAAccumulator) {
             user_assert(op->type.is_float() && op->type.bits() == 32) << "currently only support float16xfloat16 to float32 for WMMA";
 
-        } else {
+        } else if (op->memory_type != MemoryType::WMMAA && op->memory_type != MemoryType::WMMAB) {
             return IRMutator::visit(op);
         }
 
@@ -910,7 +910,7 @@ protected:
         }
     }
 
-    int get_nth_tile_from_tile_index(const Expr &e) {
+    int get_nth_tile_from_tile_index_amx(const Expr &e) {
         const Ramp *ramp = e.as<Ramp>();
         if (!ramp) {
             internal_error << "AMX tile can only be indexed with ramp";
@@ -929,7 +929,7 @@ protected:
 
     Expr visit(const Load *load) override {
         if (std::find(tile_vars.begin(), tile_vars.end(), load->name) != tile_vars.end()) {
-            int tile = get_nth_tile_from_tile_index(load->index);
+            int tile = get_nth_tile_from_tile_index_amx(load->index);
             amx_tile_size[load->name] = std::max(amx_tile_size[load->name], tile + 1);
             Type tile_type = convert_to_tile_type(load->type);
             int tile_lanes = tile_type.lanes();
@@ -948,7 +948,7 @@ protected:
     Stmt visit(const Store *store) override {
         if (std::find(tile_vars.begin(), tile_vars.end(), store->name) != tile_vars.end()) {
             internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
-            int tile = get_nth_tile_from_tile_index(store->index);
+            int tile = get_nth_tile_from_tile_index_amx(store->index);
             amx_tile_size[store->name] = std::max(amx_tile_size[store->name], tile + 1);
             int tile_lanes = convert_to_tile_type(store->value.type()).lanes();
 
@@ -998,7 +998,7 @@ protected:
 class EnforceWMMALanes : public IRMutator {
     using IRMutator::visit;
 
-    std::vector<string> tile_vars;
+    std::map<string, MemoryType> tile_vars;
     std::map<string, Type> intrinsic_types = {
         {"wmma.load.a.sync.aligned.row.m16n16k16.f16", Int(32, 8)},
         {"wmma.load.b.sync.aligned.row.m16n16k16.f16", Int(32, 8)},
@@ -1006,23 +1006,41 @@ class EnforceWMMALanes : public IRMutator {
         {"wmma.load.c.sync.aligned.row.m16n16k16.f32", Float(32, 8)},
     };
 
+    int get_nth_tile_from_tile_index_wmma(const Expr &e) {
+        const Ramp *ramp = e.as<Ramp>();
+        if (!ramp) {
+            internal_error << "WMMA tile can only be indexed with ramp";
+            return -1;
+        }
+        int vec_length = ramp->lanes;
+        const int64_t *basep = as_const_int(ramp->base);
+        if (!basep) {
+            internal_error << "Only constant base is supported in WMMA";
+            return -1;
+        }
+        int base = (int)*basep;
+        internal_assert(base % vec_length == 0) << "Cannot determine which WMMA tile to load from";
+        return base / vec_length;
+    }
+
 protected:
     bool wmma_used = false;
 
     Stmt visit(const Allocate *op) override {
-        if (op->memory_type == MemoryType::WMMAAccumulator) {
-            internal_assert(op->constant_allocation_size() % 32 == 0);
+        if (op->memory_type == MemoryType::WMMAAccumulator || op->memory_type == MemoryType::WMMAB || op->memory_type == MemoryType::WMMAA) {
+            internal_assert(op->constant_allocation_size() != 0 && op->constant_allocation_size() % 32 == 0);
             internal_assert(op->type.lanes() == 1);
 
-            std::vector<string> curr_tile_vars(this->tile_vars);
-            curr_tile_vars.push_back(op->name);
-            ScopedValue<vector<string>> old_tile_vars(tile_vars, std::move(curr_tile_vars));
+            std::map<string, MemoryType> curr_tile_vars(this->tile_vars);
+            curr_tile_vars[op->name] = op->memory_type;
+            ScopedValue<std::map<string, MemoryType>> old_tile_vars(tile_vars, std::move(curr_tile_vars));
 
             auto body = mutate(op->body);
             auto lanes = op->constant_allocation_size() / 32;
+            Type type = op->memory_type == MemoryType::WMMAAccumulator ? Float(32) : Int(32);
             return Allocate::make(op->name,
-                                  op->type.with_lanes(1),
-                                  MemoryType::WMMAAccumulator, {lanes}, const_true(),
+                                  type,
+                                  op->memory_type, {lanes}, const_true(),
                                   body);
         } else {
             return IRMutator::visit(op);
@@ -1042,6 +1060,9 @@ protected:
                 op->value_index,
                 op->image,
                 op->param);
+        } else if (op->name == "wmma.load.c.sync.aligned.row.m16n16k16.f32.ZERO") {
+            wmma_used = true;
+            return make_zero(Float(32, 8));
         } else {
             if (op->name == "wmma.store.d.sync.aligned.row.m16n16k16.f32") {
                 wmma_used = true;
@@ -1051,13 +1072,16 @@ protected:
     }
 
     Expr visit(const Load *load) override {
-        if (std::find(tile_vars.begin(), tile_vars.end(), load->name) != tile_vars.end()) {
+        auto it = tile_vars.find(load->name);
+        if (it != tile_vars.end()) {
             internal_assert(load->type.lanes() % 32 == 0);
+            int nth = get_nth_tile_from_tile_index_wmma(load->index);
             int tile_lanes = load->type.lanes() / 32;
-            Type tile_type = load->type.with_lanes(tile_lanes);
+            MemoryType mt = it->second;
+            Type tile_type = mt == MemoryType::WMMAAccumulator ? Float(32, tile_lanes) : Int(32, tile_lanes);
             return Load::make(tile_type,
                               load->name,
-                              Ramp::make(0, 1, tile_lanes),
+                              Ramp::make(nth * 8, 1, tile_lanes),
                               load->image,
                               load->param,
                               const_true(tile_lanes),
@@ -1079,10 +1103,11 @@ protected:
     }
 
     Stmt visit(const Store *store) override {
-        if (std::find(tile_vars.begin(), tile_vars.end(), store->name) != tile_vars.end()) {
+        if (tile_vars.find(store->name) != tile_vars.end()) {
             internal_assert(is_const_one(store->predicate)) << "Only constant predicate is supported";
             internal_assert(store->value.type().lanes() % 32 == 0);
             int tile_lanes = store->value.type().lanes() / 32;
+            int nth = get_nth_tile_from_tile_index_wmma(store->index);
 
             // There should not be a Load in places other than value,
             // so we don't need to mutate them.
@@ -1093,7 +1118,7 @@ protected:
             auto op = Store::make(
                 store->name,
                 value,
-                Ramp::make(0, 1, tile_lanes),
+                Ramp::make(nth * 8, 1, tile_lanes),
                 store->param,
                 const_true(tile_lanes),
                 store->alignment);
@@ -1157,7 +1182,7 @@ class PushWMMAAllocation : public IRMutator {
 
 protected:
     Stmt visit(const Allocate *op) override {
-        if (op->memory_type == MemoryType::WMMAAccumulator) {
+        if (op->memory_type == MemoryType::WMMAAccumulator || op->memory_type == MemoryType::WMMAA || op->memory_type == MemoryType::WMMAB) {
             ScopedValue<vector<const Allocate *>> old_alloc_ops(alloc_ops);
             alloc_ops.push_back(op);
             return mutate(op->body);
@@ -1178,7 +1203,6 @@ protected:
             return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, body);
         } else {
             return For::make(op->name, op->min, op->extent, op->for_type, op->partition_policy, op->device_api, mutate(op->body));
-            ;
         }
     }
 };
